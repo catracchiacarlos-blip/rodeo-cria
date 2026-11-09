@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B3133">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rodeo de cría">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Rodeo de cría · APSAVET</title>
+<style>
+:root{
+  --brand:#0B3133; --brand2:#0A6E6C; --acc:#17BEBB; --bg:#F3F6F4; --card:#fff; --ink:#1B2E30; --mute:#5E7273; --line:#D9E3E1;
+  --ok:#1E7B45; --okbg:#E3F3E8; --warn:#9A6A00; --warnbg:#FFF3D6; --bad:#B42318; --badbg:#FDE7E4; --plan:#2563A8; --planbg:#E4EEFA;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:20;background:var(--brand);color:#fff;padding:10px 14px calc(10px);padding-top:max(10px,env(safe-area-inset-top));display:flex;align-items:center;gap:10px}
+header .t{flex:1;min-width:0}
+header b{display:block;font-size:18px;line-height:1.15}
+header small{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:999px;padding:6px 12px;font-size:14px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;background:#7FD99A;display:inline-block}
+.dot.off{background:#F2B544}.dot.err{background:#FF7A6B}
+main{padding:14px 14px 110px;max-width:760px;margin:0 auto}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:20;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs button{flex:1;border:0;background:none;padding:10px 4px 12px;font-size:14px;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:2px}
+nav.tabs button[aria-current=page]{color:var(--brand2);font-weight:700}
+nav.tabs svg{width:24px;height:24px}
+h1{font-size:24px;margin:4px 0 12px}
+h2{font-size:19px;margin:18px 0 8px}
+h3{font-size:16px;margin:12px 0 6px}
+.muted{color:var(--mute)} .small{font-size:14px}
+.grid{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.big{border:0;border-radius:var(--r);background:var(--card);padding:16px 14px;text-align:left;box-shadow:0 1px 0 var(--line);display:flex;flex-direction:column;gap:4px;min-height:92px}
+.big b{font-size:19px} .big span{font-size:14px;color:var(--mute)}
+.big.dark{background:var(--brand);color:#fff} .big.dark span{color:#CFE5E3}
+.big.wide{grid-column:1/-1}
+.card{background:var(--card);border-radius:var(--r);padding:14px;box-shadow:0 1px 0 var(--line);margin-bottom:12px}
+.field{display:flex;flex-direction:column;gap:6px;margin:0 0 14px}
+.field>label,.lbl{font-size:14px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+input[type=text],input[type=number],input[type=date],input[type=datetime-local],input[type=search],input[type=url],select,textarea{width:100%;border:2px solid var(--line);border-radius:12px;padding:12px;background:#fff;min-height:52px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand2)}
+textarea{min-height:80px;resize:vertical}
+.idin{font-size:24px;font-weight:700;letter-spacing:.04em}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg button{flex:1 1 0;min-width:64px;min-height:56px;border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;font-weight:600}
+.seg.g2{display:grid;grid-template-columns:1fr 1fr}
+.seg.xl button{min-height:72px;font-size:22px}
+.seg button[aria-pressed=true]{background:var(--brand2);border-color:var(--brand2);color:#fff}
+.seg button[data-tone=bad][aria-pressed=true]{background:var(--bad);border-color:var(--bad)}
+.seg button[data-tone=warn][aria-pressed=true]{background:#C98A00;border-color:#C98A00}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:4px 10px;font-size:13px;font-weight:600;background:#EEF2F1;color:var(--ink);border:0}
+.chip.ok{background:var(--okbg);color:var(--ok)} .chip.warn{background:var(--warnbg);color:var(--warn)} .chip.bad{background:var(--badbg);color:var(--bad)} .chip.plan{background:var(--planbg);color:var(--plan)}
+button.chip{min-height:36px;padding:6px 12px}
+.btn{border:2px solid var(--brand2);color:var(--brand2);background:#fff;border-radius:12px;padding:12px 16px;font-weight:700;min-height:52px}
+.btn.solid{background:var(--brand2);color:#fff}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn.block{width:100%}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.savebar{position:fixed;left:0;right:0;bottom:calc(64px + env(safe-area-inset-bottom));z-index:15;padding:10px 14px;background:linear-gradient(rgba(243,246,244,0),var(--bg) 30%)}
+.savebar .in{max-width:760px;margin:0 auto;display:flex;gap:10px}
+.savebar .btn{flex:1;min-height:60px;font-size:19px}
+.back{border:0;background:none;color:var(--brand2);font-weight:700;padding:6px 0;margin-bottom:6px}
+.list{display:flex;flex-direction:column}
+.item{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .grow{flex:1;min-width:0}
+.item b{display:block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:#fff;border-radius:var(--r);padding:12px;box-shadow:0 1px 0 var(--line)}
+.kpi span{font-size:13px;color:var(--mute);display:block}
+.kpi b{font-size:26px;display:block;line-height:1.2}
+.kpi small{font-size:12px;color:var(--mute)}
+.kpi.ok{box-shadow:inset 0 0 0 2px var(--okbg)} .kpi.ok b{color:var(--ok)}
+.kpi.warn b{color:var(--warn)} .kpi.bad b{color:var(--bad)}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.03em}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.cal td,.cal th{padding:4px 2px;text-align:center;font-size:12px}
+.cal td:first-child,.cal th:first-child{text-align:left;font-size:13px;position:sticky;left:0;background:#fff;min-width:150px;white-space:normal}
+.cell{display:block;min-width:30px;height:30px;border-radius:7px;line-height:30px;font-weight:700;font-size:11px;border:0;padding:0;width:100%}
+.cell.plan{background:var(--planbg);color:var(--plan)} .cell.done{background:var(--ok);color:#fff} .cell.late{background:var(--bad);color:#fff} .cell.extra{background:var(--okbg);color:var(--ok)}
+.banner{background:var(--warnbg);color:#5C4300;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:15px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom));background:var(--brand);color:#fff;padding:12px 18px;border-radius:12px;z-index:50;font-weight:600;max-width:90vw;text-align:center}
+.serie{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto}
+.subtabs{display:flex;gap:6px;overflow-x:auto;margin:-2px 0 12px;padding-bottom:4px}
+.subtabs button{border:2px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-weight:600;white-space:nowrap}
+.subtabs button[aria-current=page]{background:var(--brand);border-color:var(--brand);color:#fff}
+.bar{height:10px;border-radius:5px;background:var(--brand2)}
+details summary{cursor:pointer;font-weight:600;color:var(--brand2);padding:6px 0}
+.eid{font-family:ui-monospace,Menlo,monospace;font-size:14px}
+svg text{font-family:system-ui,sans-serif}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="t"><b id="h-title">Rodeo de cría</b><small id="h-sub">APSAVET</small></div>
+  <button class="sync" id="btn-sync" type="button"><span class="dot" id="sync-dot"></span><span id="sync-txt">…</span></button>
+</header>
+<main id="app"></main>
+<div id="savebar"></div>
+<nav class="tabs" id="tabs">
+  <button data-tab="campo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M5 20V9l7-5 7 5v11"/><path d="M9 20v-6h6v6"/></svg>Campo</button>
+  <button data-tab="manga"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4v16M20 4v16M4 8h16M4 16h16M10 8v8M14 8v8"/></svg>Manga</button>
+  <button data-tab="oficina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Oficina</button>
+</nav>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(() => {
+"use strict";
+
+/* ====================== configuración ====================== */
+// Dirección del servidor (Apps Script /exec). También se puede pasar en el link: ?api=...
+const API_DEFAULT = "https://script.google.com/macros/s/AKfycbwf5wg1hXDu_sKGDq52Z4w3L8AZQvkKbsZ8qCnUTbwFj2zCo1jmhZuMSp9CZZGerYZ8Pw/exec";
+const ESTAB_DEFAULT = {id:"los-ranqueles", nombre:"Los Ranqueles"};
+const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const MESES_L = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+// Plan base tomado de la planilla "Manejo en rodeo de cría"
+const PLAN_BASE = [
+  {id:"entore",      grupo:"Reproductivo", nombre:"Entore",                     meses:{10:"",11:"",12:""}},
+  {id:"paricion",    grupo:"Reproductivo", nombre:"Parición",                   meses:{7:"",8:"",9:""}},
+  {id:"destete",     grupo:"Reproductivo", nombre:"Destete",                    meses:{2:"",3:""}},
+  {id:"tacto",       grupo:"Reproductivo", nombre:"Tacto",                      meses:{2:"",9:""}},
+  {id:"v-repro",     grupo:"Vacas",        nombre:"Vacuna reproductiva",        meses:{9:""}},
+  {id:"v-cobre",     grupo:"Vacas",        nombre:"Cobre",                      meses:{5:"",9:""}},
+  {id:"v-querato",   grupo:"Vacas",        nombre:"Queratoconjuntivitis",       meses:{9:""}},
+  {id:"v-diarrea",   grupo:"Vacas",        nombre:"Diarrea neonatal",           meses:{5:"",6:""}},
+  {id:"v-clostr",    grupo:"Vacas",        nombre:"Clostridial",                meses:{5:"",6:""}},
+  {id:"v-aftosa",    grupo:"Vacas",        nombre:"Aftosa / carbunclo / brucelosis", meses:{3:"",12:""}},
+  {id:"q-repro",     grupo:"Vaquillonas",  nombre:"Vacuna reproductiva",        meses:{8:"",9:""}},
+  {id:"q-cobre",     grupo:"Vaquillonas",  nombre:"Cobre",                      meses:{5:"",9:""}},
+  {id:"q-querato",   grupo:"Vaquillonas",  nombre:"Queratoconjuntivitis",       meses:{9:""}},
+  {id:"q-diarrea",   grupo:"Vaquillonas",  nombre:"Diarrea neonatal",           meses:{3:"",5:""}},
+  {id:"q-clostr",    grupo:"Vaquillonas",  nombre:"Clostridial",                meses:{5:"",9:""}},
+  {id:"q-aftosa",    grupo:"Vaquillonas",  nombre:"Aftosa / carbunclo / brucelosis", meses:{3:"",12:""}},
+  {id:"t-clostr",    grupo:"Terneros",     nombre:"Clostridial",                meses:{10:"1ª",12:"2ª",3:"3ª"}},
+  {id:"t-resp",      grupo:"Terneros",     nombre:"Respiratoria",               meses:{10:"1ª",12:"2ª",3:"3ª"}},
+  {id:"t-querato",   grupo:"Terneros",     nombre:"Queratoconjuntivitis",       meses:{10:"1ª",12:"2ª",3:"3ª"}},
+  {id:"t-bruce",     grupo:"Terneros",     nombre:"Brucelosis (terneras)",      meses:{12:""}},
+  {id:"r-aftosa",    grupo:"Toros",        nombre:"Aftosa / carbunclo",         meses:{3:"",12:""}},
+  {id:"d-iver",      grupo:"Desparasitación", nombre:"Terneros: ivermectina (verano)", meses:{12:""}},
+  {id:"d-levam",     grupo:"Desparasitación", nombre:"Terneros: levamisol / ricobendazol (invierno)", meses:{4:"",9:""}},
+  {id:"x-bruce",     grupo:"Diagnóstico",  nombre:"Vacas/vaquillonas: brucelosis", meses:{3:""}},
+  {id:"x-tbc",       grupo:"Diagnóstico",  nombre:"Vacas/vaquillonas: tuberculosis", meses:{3:""}},
+  {id:"x-raspaje",   grupo:"Diagnóstico",  nombre:"Toros: raspaje (tricho / campylo)", meses:{3:"",7:""}},
+  {id:"x-tbctoro",   grupo:"Diagnóstico",  nombre:"Toros: tuberculosis",        meses:{3:""}}
+];
+const PASTO = {oferta:[3,3,4,4,2,1,1,1,4,5,5,4], req:[3,2,2,1,1,1,2,3,4,5,5,4]};
+const METAS_BASE = {prenez:90, cabeza:60, mortPeri:3, mortDest:3, destete:85, kgVaca:160, torosMin:3, torosMax:4, ccServicio:3};
+
+const TIPOS = {
+  parto:{n:"Parto",pl:"Partos"}, muerte:{n:"Muerte",pl:"Muertes"}, novedad:{n:"Novedad",pl:"Novedades"},
+  tacto:{n:"Tacto",pl:"Tactos"}, toro:{n:"Revisación de toro",pl:"Toros revisados"}, cc:{n:"Condición corporal",pl:"Registros de CC"},
+  sanidad:{n:"Sanidad / tarea",pl:"Sanidad y tareas"}, destete:{n:"Destete",pl:"Destetes"}, pesada:{n:"Pesada",pl:"Pesadas"}
+};
+const CAUSAS_TERNERO = ["Distocia","Débil al nacer","Frío / lluvia","Predador","Diarrea","Desconocida"];
+const CAUSAS_ADULTO = ["Parto","Empaste / meteorismo","Accidente","Enfermedad","Vejez / flaca","Desconocida"];
+const SENAS = ["Negra","Colorada","Overa","Cara blanca","Mocha","Marca en oreja"];
+const DIFIC = [["1","Sin ayuda"],["2","Ayuda leve"],["3","Ayuda fuerte"],["4","Veterinario / mala presentación"]];
+const NOVEDADES = ["Aguada","Alambrado","Animal enfermo","Animal fuera de lugar","Pasto","Otro"];
+
+/* ====================== utilidades ====================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const pad = n => String(n).padStart(2,"0");
+const nowLocal = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const todayStr = () => nowLocal().slice(0,10);
+const fmtD = s => { if(!s) return ""; const [y,m,d]=s.slice(0,10).split("-"); return `${d}/${m}/${y.slice(2)}`; };
+const fmtDT = s => s ? fmtD(s)+(s.length>10?" "+s.slice(11,16):"") : "";
+const num = v => { if(v===""||v==null) return null; const n=parseFloat(String(v).replace(",",".")); return isNaN(n)?null:n; };
+const pct = (a,b) => b>0 ? a/b*100 : null;
+const f1 = v => v==null||isNaN(v) ? "—" : (Math.round(v*10)/10).toLocaleString("es-AR");
+const f0 = v => v==null||isNaN(v) ? "—" : Math.round(v).toLocaleString("es-AR");
+const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+const slug = s => norm(s).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || uid();
+function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2600); }
+function vibrar(){ try{ navigator.vibrate && navigator.vibrate(40); }catch(_){} }
+
+// Caravana electrónica: 15 dígitos (ej. 032 000123456789). Se limpian espacios y guiones.
+const soloDig = s => String(s||"").replace(/\D/g,"");
+const esEID = s => { const d=soloDig(s); return d.length>=12 && d.length<=16 && d.length===String(s).replace(/[\s.-]/g,"").length; };
+const fmtEID = s => { const d=soloDig(s); return d.length===15 ? d.slice(0,3)+" "+d.slice(3) : d; };
+function normId(s, tipo){ s=String(s||"").trim(); if(tipo==="eid"||esEID(s)) return soloDig(s); return s.toUpperCase(); }
+
+/* ====================== almacenamiento local (IndexedDB) ====================== */
+const store = {
+  db:null,
+  async open(){
+    try{
+      this.db = await new Promise((res,rej)=>{ const r=indexedDB.open("rodeo-cria",1); r.onupgradeneeded=()=>r.result.createObjectStore("kv"); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+    }catch(_){ this.db=null; }
+  },
+  async get(k){
+    if(!this.db){ try{ return JSON.parse(localStorage.getItem("rc-"+k)); }catch(_){ return null; } }
+    return new Promise(res=>{ const tx=this.db.transaction("kv").objectStore("kv").get(k); tx.onsuccess=()=>res(tx.result??null); tx.onerror=()=>res(null); });
+  },
+  async set(k,v){
+    if(!this.db){ try{ localStorage.setItem("rc-"+k, JSON.stringify(v)); }catch(_){} return; }
+    return new Promise(res=>{ const tx=this.db.transaction("kv","readwrite"); tx.objectStore("kv").put(v,k); tx.oncomplete=()=>res(); tx.onerror=()=>res(); });
+  }
+};
+
+/* ====================== estado ====================== */
+const S = {
+  R:{},            // todos los registros por id (eventos y config)
+  outbox:{},       // id -> true (pendientes de subir)
+  set:{api:"", codigo:"", operario:"", estab:"", potrero:"", lote:""},
+  lastSync:0, syncState:"idle", syncErr:"",
+  tab:"campo", view:"home", f:null, sub:"resumen",
+  serie:[], q:"", filt:null, campSel:null, calYear:new Date().getFullYear(), editId:null, imp:null
+};
+let saveT;
+function persist(){ clearTimeout(saveT); saveT=setTimeout(()=>{ store.set("R",S.R); store.set("outbox",S.outbox); store.set("set",S.set); store.set("lastSync",S.lastSync); },150); }
+
+function put(rec){
+  rec.actualizadoLocal = Date.now();
+  if(!rec.creado) rec.creado = new Date().toISOString();
+  S.R[rec.id]=rec; S.outbox[rec.id]=true; persist(); syncSoon();
+}
+const eventos = () => Object.values(S.R).filter(r=>r.clase!=="config" && !r.borrado && r.estab===S.set.estab);
+function estabRec(id){ id=id||S.set.estab; const r=S.R["estab-"+id]; return r && !r.borrado ? r : null; }
+function estab(){
+  let r=estabRec();
+  if(!r){ r={clase:"config", tipo:"estab", id:"estab-"+(S.set.estab||ESTAB_DEFAULT.id), estab:S.set.estab||ESTAB_DEFAULT.id, nombre:S.set.estab===ESTAB_DEFAULT.id||!S.set.estab?ESTAB_DEFAULT.nombre:S.set.estab, plan:JSON.parse(JSON.stringify(PLAN_BASE)), metas:{...METAS_BASE}, campanas:{}, potreros:[], detalle:"" }; }
+  if(!r.plan) r.plan=JSON.parse(JSON.stringify(PLAN_BASE));
+  if(!r.metas) r.metas={...METAS_BASE};
+  if(!r.campanas) r.campanas={};
+  return r;
+}
+function saveEstab(r){ r.detalle = r.nombre; put(r); }
+const listaEstabs = () => { const m={}; Object.values(S.R).filter(r=>r.tipo==="estab"&&!r.borrado).forEach(r=>m[r.estab]=r.nombre); if(!Object.keys(m).length) m[ESTAB_DEFAULT.id]=ESTAB_DEFAULT.nombre; return m; };
+
+/* Campaña = año del entore. Parto de 2027 → campaña 2026 (entore oct–dic 2026). */
+function campOf(r){
+  if(r.campana) return Number(r.campana);
+  const y=Number((r.fecha||"").slice(0,4)), m=Number((r.fecha||"").slice(5,7));
+  if(!y) return null;
+  if(r.tipo==="parto") return y-1;
+  if(r.tipo==="tacto") return m<=8 ? y-1 : y;
+  if(r.tipo==="destete") return m<=6 ? y-2 : y-1;
+  if(r.tipo==="muerte" && r.categoria==="ternero") return m<=6 ? y-2 : y-1;
+  if(r.tipo==="toro") return m>=7 ? y : y-1;
+  return m>=10 ? y : y-1;
+}
+
+/* ====================== sincronización ====================== */
+let syncT;
+function syncSoon(){ clearTimeout(syncT); syncT=setTimeout(sync,2500); renderSync(); }
+async function sync(){
+  if(!S.set.api){ S.syncState="local"; renderSync(); return; }
+  if(!navigator.onLine){ S.syncState="offline"; renderSync(); return; }
+  if(S.syncState==="busy") return;
+  S.syncState="busy"; renderSync();
+  try{
+    const ids=Object.keys(S.outbox);
+    for(let i=0;i<ids.length;i+=150){
+      const chunk=ids.slice(i,i+150).filter(id=>S.R[id]);
+      const vers={}; chunk.forEach(id=>vers[id]=S.R[id].actualizadoLocal);
+      const ops=chunk.map(id=>S.R[id]);
+      const r=await fetch(S.set.api,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({codigo:S.set.codigo,ops})});
+      const j=await r.json();
+      if(!j.ok) throw new Error(j.error||"error");
+      chunk.forEach(id=>{ if(S.R[id] && S.R[id].actualizadoLocal===vers[id]) delete S.outbox[id]; });
+    }
+    const desde=Math.max(0,S.lastSync-120000);
+    const r=await fetch(S.set.api+(S.set.api.includes("?")?"&":"?")+"codigo="+encodeURIComponent(S.set.codigo)+"&desde="+desde);
+    const j=await r.json();
+    if(!j.ok) throw new Error(j.error||"error");
+    (j.registros||[]).forEach(rec=>{ if(!S.outbox[rec.id]) S.R[rec.id]=rec; });
+    S.lastSync=j.ahora; S.syncState="ok"; S.syncErr="";
+    persist();
+    if(!S.f && S.view!=="setup") render();
+  }catch(e){
+    S.syncState="err"; S.syncErr=String(e.message||e);
+    if(S.syncErr.includes("CODIGO")) S.syncErr="El código de acceso no es válido";
+  }
+  renderSync();
+}
+function renderSync(){
+  const n=Object.keys(S.outbox).length, d=$("#sync-dot"), t=$("#sync-txt");
+  d.className="dot"+(S.syncState==="err"?" err":(n||S.syncState==="offline"||S.syncState==="local")?" off":"");
+  t.textContent = S.syncState==="busy" ? "Subiendo…" : !S.set.api ? (n?`${n} en el celular`:"Sin servidor") : n ? `${n} sin subir` : S.syncState==="err" ? "Error" : "Al día";
+}
+window.addEventListener("online",()=>sync());
+window.addEventListener("offline",()=>{ S.syncState="offline"; renderSync(); });
+setInterval(()=>{ if(document.visibilityState==="visible") sync(); },60000);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") sync(); });
+
+/* ====================== widgets ====================== */
+function seg(field,opts,val,cls=""){
+  return `<div class="seg ${cls}">`+opts.map(o=>{ const [v,l,tone]=Array.isArray(o)?o:[o,o]; return `<button type="button" data-set="${field}" data-v="${esc(v)}" ${tone?`data-tone="${tone}"`:""} aria-pressed="${String(val)===String(v)}">${esc(l)}</button>`; }).join("")+`</div>`;
+}
+function inp(field,val,{type="text",ph="",mode="",cls="",id=""}={}){
+  return `<input type="${type}" data-f="${field}" ${id?`id="${id}"`:""} value="${esc(val??"")}" placeholder="${esc(ph)}" ${mode?`inputmode="${mode}"`:""} class="${cls}" autocomplete="off" autocapitalize="characters" enterkeyhint="next">`;
+}
+function fld(label,html,hint=""){ return `<div class="field"><label>${label}</label>${html}${hint?`<span class="small muted">${hint}</span>`:""}</div>`; }
+function chipsPick(field,opts,val){ return `<div class="chips">`+opts.map(o=>`<button type="button" class="chip ${String(val)===String(o)?"ok":""}" data-set="${field}" data-v="${esc(o)}">${esc(o)}</button>`).join("")+`</div>`; }
+
+// Campo de identificación: caravana visual, número pintado, caravana electrónica (bastón) o sin identificar
+function idBlock(prefix, f, label, allowSin=true){
+  const t=f[prefix+"Tipo"]||"visual";
+  const opts=[["visual","Caravana"],["eid","Electrónica"],["pintado","Nº pintado"]]; if(allowSin) opts.push(["sin","Sin identificar"]);
+  let h=`<div class="field"><label>${label}</label>${seg(prefix+"Tipo",opts,t,"g2")}`;
+  if(t==="sin"){
+    h+=`<span class="small muted">Describila para poder encontrarla después.</span>${chipsPick(prefix+"Sena",SENAS,f[prefix+"Sena"])}${inp(prefix+"SenaTxt",f[prefix+"SenaTxt"],{ph:"Otra seña (pelaje, marca, con quién anda)"})}`;
+  } else {
+    h+=`${inp(prefix,f[prefix],{ph:t==="eid"?"Leé con el bastón o escribí los 15 dígitos":t==="pintado"?"Número pintado":"Número de caravana",mode:t==="visual"?"text":"numeric",cls:"idin",id:"in-"+prefix})}`;
+    if(t==="eid") h+=`<span class="small muted">Con el bastón conectado por Bluetooth (modo teclado), tocá el cuadro y pasá el bastón.</span>`;
+    const hist = prefix==="madre"||prefix==="animal" ? historial(normId(f[prefix],t)) : "";
+    if(hist) h+=hist;
+  }
+  return h+`</div>`;
+}
+function historial(id){
+  if(!id) return "";
+  const ev=eventos().filter(e=>e.animal===id||e.madre===id).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).slice(0,3);
+  if(!ev.length) return "";
+  return `<div class="chips">`+ev.map(e=>`<span class="chip plan">${TIPOS[e.tipo]?.n||e.tipo} ${fmtD(e.fecha)}${e.resultado?" · "+e.resultado:""}</span>`).join("")+`</div>`;
+}
+const identOf = (f,p) => { const t=f[p+"Tipo"]||"visual"; if(t==="sin") return {id:"", ident:"sin", sena:[f[p+"Sena"],f[p+"SenaTxt"]].filter(Boolean).join(" · ")}; return {id:normId(f[p],t), ident:t, sena:""}; };
+function provisional(){ const d=new Date(); return "P"+String(d.getFullYear()).slice(2)+pad(d.getMonth()+1)+pad(d.getDate())+"-"+Math.random().toString(36).slice(2,5).toUpperCase(); }
+
+/* ====================== GPS ====================== */
+function gps(f){
+  if(!navigator.geolocation) return;
+  try{ navigator.geolocation.getCurrentPosition(p=>{ if(S.f===f){ f.lat=+p.coords.latitude.toFixed(6); f.lng=+p.coords.longitude.toFixed(6); } },()=>{}, {enableHighAccuracy:true,timeout:15000,maximumAge:120000}); }catch(_){}
+}
+
+/* ====================== formularios ====================== */
+function nuevo(tipo, extra={}){
+  const f={tipo, fecha:nowLocal(), potrero:S.set.potrero||"", lote:S.set.lote||"", madreTipo:"visual", animalTipo:"visual", ...extra};
+  if(tipo==="parto"){ f.estado="vivo"; f.dificultad="1"; f.terneroTipo="prov"; }
+  if(tipo==="tacto"||tipo==="cc"||tipo==="destete"||tipo==="pesada"){ S.serie=[]; }
+  if(tipo==="toro"){ f.aptitud=""; f.tricho="pend"; f.campylo="pend"; f.animalTipo="visual"; }
+  S.f=f; S.view="form"; S.editId=null; gps(f); render(); window.scrollTo(0,0);
+}
+function editar(id){
+  const r=S.R[id]; if(!r) return;
+  const f={...r};
+  if(r.tipo==="parto"){ f.madreTipo=r.madreIdent||"visual"; f.madre=r.madre; f.terneroTipo=r.ident==="prov"?"prov":"cav"; f.ternero=r.ident==="prov"?"":r.animal; }
+  else { f.animalTipo=r.ident||"visual"; }
+  if(r.ident==="sin"||r.madreIdent==="sin"){ const k=r.tipo==="parto"?"madre":"animal"; f[k+"Tipo"]="sin"; f[k+"SenaTxt"]=r.sena||r.madreSena||""; }
+  S.f=f; S.editId=id; S.view="form"; render(); window.scrollTo(0,0);
+}
+
+function formParto(f){
+  return `<h1>Parto</h1>
+  ${idBlock("madre",f,"Madre")}
+  ${fld("Ternero", seg("terneroTipo",[["prov","Sin caravana"],["cav","Caravana"],["eid","Electrónica"]],f.terneroTipo)
+     + (f.terneroTipo==="prov" ? `<span class="small muted">Se le da un número provisorio; después se vincula a su caravana desde Oficina.</span>` : inp("ternero",f.ternero,{ph:f.terneroTipo==="eid"?"Leé con el bastón":"Caravana del ternero",mode:f.terneroTipo==="eid"?"numeric":"text",cls:"idin",id:"in-ternero"})))}
+  ${fld("Sexo", seg("sexo",[["M","Macho"],["H","Hembra"]],f.sexo,"xl"))}
+  ${fld("Estado", seg("estado",[["vivo","Vivo"],["muerto","Muerto","bad"]],f.estado,"xl"))}
+  ${f.estado==="muerto"?fld("Causa", chipsPick("causa",CAUSAS_TERNERO,f.causa)):""}
+  ${fld("Dificultad del parto", seg("dificultad",DIFIC.map(([v,l])=>[v,l,v>="3"?"warn":""]),f.dificultad,"g2"))}
+  <div class="row2">${fld("Peso al nacer (kg)", inp("peso",f.peso,{type:"number",mode:"decimal",ph:"Opcional"}))}${fld("Potrero", inp("potrero",f.potrero,{ph:"Potrero"}))}</div>
+  ${potrerosRecientes(f)}
+  ${fld("Observaciones", `<textarea data-f="obs" placeholder="Podés dictar con el micrófono del teclado">${esc(f.obs||"")}</textarea>`)}
+  ${masDatos(f)}`;
+}
+function potrerosRecientes(f){
+  const ps=[...new Set(eventos().map(e=>e.potrero).filter(Boolean))].slice(-6);
+  return ps.length?`<div class="chips" style="margin:-6px 0 14px">${ps.map(p=>`<button type="button" class="chip ${f.potrero===p?"ok":""}" data-set="potrero" data-v="${esc(p)}">${esc(p)}</button>`).join("")}</div>`:"";
+}
+function masDatos(f){
+  return `<details><summary>Fecha, lote y ubicación</summary>
+    <div class="row2">${fld("Fecha y hora", inp("fecha",f.fecha,{type:"datetime-local"}))}${fld("Lote / rodeo", inp("lote",f.lote,{ph:"Opcional"}))}</div>
+    <p class="small muted">${f.lat?`Ubicación guardada: ${f.lat}, ${f.lng}`:"Ubicación: se toma sola si el celular lo permite."}</p>
+  </details>`;
+}
+function formMuerte(f){
+  const cat=f.categoria||"ternero";
+  return `<h1>Muerte</h1>
+  ${fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaquillona"],["ternero","Ternero"],["toro","Toro"]],cat))}
+  ${idBlock("animal",f,"Animal")}
+  ${fld("Causa probable", chipsPick("causa",cat==="ternero"?CAUSAS_TERNERO:CAUSAS_ADULTO,f.causa))}
+  ${fld("Potrero", inp("potrero",f.potrero,{ph:"Potrero"}))}${potrerosRecientes(f)}
+  ${fld("Observaciones", `<textarea data-f="obs">${esc(f.obs||"")}</textarea>`)}
+  ${masDatos(f)}`;
+}
+function formNovedad(f){
+  return `<h1>Novedad</h1>
+  ${fld("Qué pasa", chipsPick("categoria",NOVEDADES,f.categoria))}
+  ${fld("Potrero", inp("potrero",f.potrero,{ph:"Potrero"}))}${potrerosRecientes(f)}
+  ${fld("Detalle", `<textarea data-f="obs" placeholder="Contá qué viste. Podés dictar con el micrófono.">${esc(f.obs||"")}</textarea>`)}
+  ${masDatos(f)}`;
+}
+function formToro(f){
+  return `<h1>Revisación de toro</h1>
+  ${idBlock("animal",f,"Toro",false)}
+  <div class="row2">${fld("Circunferencia escrotal (cm)", inp("ce",f.ce,{type:"number",mode:"decimal"}))}${fld("Edad (años)", inp("edad",f.edad,{type:"number",mode:"decimal"}))}</div>
+  ${fld("Aptitud física", seg("aptitud",[["apto","Apto"],["no","No apto","bad"]],f.aptitud))}
+  ${fld("Trichomoniasis", seg("tricho",[["neg","Negativo"],["pos","Positivo","bad"],["pend","Pendiente"]],f.tricho))}
+  ${fld("Campylobacteriosis", seg("campylo",[["neg","Negativo"],["pos","Positivo","bad"],["pend","Pendiente"]],f.campylo))}
+  ${fld("Observaciones", `<textarea data-f="obs">${esc(f.obs||"")}</textarea>`)}
+  ${masDatos(f)}`;
+}
+function formSanidad(f){
+  const E=estab(), tareas=E.plan;
+  return `<h1>Sanidad / tarea del plan</h1>
+  ${fld("Tarea del plan", `<select data-f="tarea"><option value="">Elegir…</option>${["Reproductivo","Vacas","Vaquillonas","Terneros","Toros","Desparasitación","Diagnóstico"].map(g=>`<optgroup label="${g}">${tareas.filter(t=>t.grupo===g).map(t=>`<option value="${t.id}" ${f.tarea===t.id?"selected":""}>${esc(t.nombre)}</option>`).join("")}</optgroup>`).join("")}<option value="otra" ${f.tarea==="otra"?"selected":""}>Otra (fuera del plan)</option></select>`)}
+  ${fld("Producto / dosis", inp("producto",f.producto,{ph:"Ej. vacuna reproductiva, 5 ml"}))}
+  <div class="row2">${fld("Animales", inp("cantidad",f.cantidad,{type:"number",mode:"numeric"}))}${fld("Lote / rodeo", inp("lote",f.lote,{ph:"Opcional"}))}</div>
+  ${f.lista&&f.lista.length?`<p class="small">Incluye ${f.lista.length} caravanas electrónicas leídas.</p>`:""}
+  ${fld("Fecha", inp("fecha",f.fecha,{type:"datetime-local"}))}
+  ${fld("Observaciones", `<textarea data-f="obs">${esc(f.obs||"")}</textarea>`)}`;
+}
+
+/* ----- manga: carga en serie ----- */
+function formSerie(f){
+  const t=f.tipo, titulo={tacto:"Tacto",cc:"Condición corporal",destete:"Destete",pesada:"Pesada"}[t];
+  let res="";
+  if(t==="tacto") res=fld("Resultado", seg("resultado",[["cabeza","Cabeza"],["cuerpo","Cuerpo"],["cola","Cola"],["vacia","Vacía","bad"]],f.resultado,"xl"));
+  if(t==="cc") res=fld("Condición corporal (1 a 5)", seg("valor",["1","1.5","2","2.5","3","3.5","4","4.5","5"].map(v=>[v,v.replace(".",","),Number(v)<2.5?"bad":""]),f.valor,"xl"));
+  if(t==="destete"||t==="pesada") res=`<div class="row2">${fld("Peso (kg)", inp("peso",f.peso,{type:"number",mode:"decimal",cls:"idin",id:"in-peso"}))}${t==="destete"?fld("Sexo", seg("sexo",[["M","M"],["H","H"]],f.sexo)):"<div></div>"}</div>`;
+  const cuenta=serieResumen(t);
+  return `<h1>${titulo} en manga</h1>
+  <div class="card"><div class="row2">${fld("Lote / rodeo", inp("lote",f.lote,{ph:"Ej. vacas 2° servicio"}))}${t==="tacto"||t==="cc"?fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaq."]],f.categoria||"vaca")):fld("Fecha", inp("fecha",f.fecha.slice(0,10),{type:"date"}))}</div>
+  ${t==="cc"?fld("Momento", seg("momento",[["servicio","Servicio"],["tacto","Tacto"],["preparto","Preparto"],["destete","Destete"]],f.momento)):""}</div>
+  ${idBlock("animal",f,t==="destete"?"Ternero":"Animal",t!=="destete")}
+  ${res}
+  ${t==="tacto"?`<p class="small muted">Al tocar el resultado se guarda y pasa a la siguiente.</p>`:""}
+  <div class="card"><h3 style="margin-top:0">Cargados en esta tanda: ${S.serie.length}</h3>${cuenta}
+  <div class="serie">${S.serie.slice().reverse().map(id=>{ const r=S.R[id]; if(!r||r.borrado) return ""; return `<div class="item"><span class="grow"><b class="eid">${esc(r.animal?fmtEID(r.animal):r.sena||"Sin identificar")}</b><span class="small muted">${serieTxt(r)}</span></span><button class="chip bad" data-del="${r.id}">Borrar</button></div>`; }).join("")}</div></div>`;
+}
+function serieTxt(r){ return r.tipo==="tacto"?(r.resultado==="vacia"?"Vacía":"Preñada · "+r.resultado):r.tipo==="cc"?"CC "+String(r.valor).replace(".",","):(r.peso?r.peso+" kg":"")+(r.sexo?" · "+r.sexo:""); }
+function serieResumen(t){
+  const rs=S.serie.map(id=>S.R[id]).filter(r=>r&&!r.borrado);
+  if(!rs.length) return "";
+  if(t==="tacto"){ const c={cabeza:0,cuerpo:0,cola:0,vacia:0}; rs.forEach(r=>c[r.resultado]++); const p=rs.length-c.vacia; return `<div class="chips" style="margin-bottom:8px"><span class="chip ok">Preñez ${f1(pct(p,rs.length))}%</span><span class="chip">Cabeza ${c.cabeza}</span><span class="chip">Cuerpo ${c.cuerpo}</span><span class="chip">Cola ${c.cola}</span><span class="chip bad">Vacías ${c.vacia}</span></div>`; }
+  if(t==="cc"){ const v=rs.map(r=>Number(r.valor)); const m=v.reduce((a,b)=>a+b,0)/v.length; return `<div class="chips" style="margin-bottom:8px"><span class="chip ok">Promedio ${f1(m)}</span><span class="chip bad">CC &lt; 2,5: ${v.filter(x=>x<2.5).length}</span></div>`; }
+  const w=rs.map(r=>num(r.peso)).filter(x=>x!=null); return w.length?`<div class="chips" style="margin-bottom:8px"><span class="chip ok">Peso promedio ${f0(w.reduce((a,b)=>a+b,0)/w.length)} kg</span></div>`:"";
+}
+
+/* ----- guardar ----- */
+function construir(f){
+  const r={clase:"evento", id:S.editId||uid(), estab:S.set.estab, tipo:f.tipo, fecha:f.fecha||nowLocal(), operario:S.set.operario, potrero:(f.potrero||"").trim(), lote:(f.lote||"").trim(), obs:(f.obs||"").trim(), lat:f.lat||"", lng:f.lng||""};
+  if(S.editId){ const o=S.R[S.editId]; r.operario=o.operario; r.creado=o.creado; }
+  if(f.tipo==="parto"){
+    const m=identOf(f,"madre"); r.madre=m.id; r.madreIdent=m.ident; r.madreSena=m.sena;
+    if(f.terneroTipo==="prov"){ r.animal=(S.editId&&S.R[S.editId].ident==="prov")?S.R[S.editId].animal:provisional(); r.ident="prov"; }
+    else { r.animal=normId(f.ternero,f.terneroTipo==="eid"?"eid":"visual"); r.ident=f.terneroTipo==="eid"?"eid":"visual"; }
+    r.sexo=f.sexo; r.estado=f.estado; r.causa=f.estado==="muerto"?f.causa||"":""; r.dificultad=f.dificultad; r.peso=num(f.peso);
+    r.categoria="ternero";
+  } else {
+    const a=identOf(f,"animal"); r.animal=a.id; r.ident=a.ident; r.sena=a.sena;
+    ["categoria","causa","resultado","valor","momento","sexo","aptitud","tricho","campylo","tarea","producto","madre"].forEach(k=>{ if(f[k]!=null&&f[k]!=="") r[k]=f[k]; });
+    if(f.peso!=null) r.peso=num(f.peso); if(f.ce!=null) r.ce=num(f.ce); if(f.edad!=null) r.edad=num(f.edad); if(f.cantidad!=null) r.cantidad=num(f.cantidad);
+    if(f.lista) r.lista=f.lista;
+    if(f.tipo==="toro") r.resultado = f.aptitud==="no"||f.tricho==="pos"||f.campylo==="pos" ? "no apto" : (f.aptitud==="apto"&&f.tricho==="neg"&&f.campylo==="neg") ? "apto" : "pendiente";
+    if(f.tipo==="tacto") r.estado = f.resultado==="vacia" ? "vacia" : "preñada";
+  }
+  if(f.tipo==="sanidad" && f.tarea){ const t=estab().plan.find(x=>x.id===f.tarea); r.detalle=t?t.grupo+": "+t.nombre:"Otra"; }
+  r.campana=campOf({...r,campana:null});
+  return r;
+}
+function validar(f){
+  if(f.tipo==="parto"){
+    if((f.madreTipo||"visual")!=="sin" && !String(f.madre||"").trim()) return "Falta el número de la madre (o marcá Sin identificar)";
+    if(!f.sexo) return "Marcá si es macho o hembra";
+    if(f.terneroTipo!=="prov" && !String(f.ternero||"").trim()) return "Falta la caravana del ternero";
+  }
+  if(["muerte","toro","tacto","destete","pesada"].includes(f.tipo) && (f.animalTipo||"visual")!=="sin" && !String(f.animal||"").trim()) return "Falta la identificación del animal";
+  if(f.tipo==="muerte" && !f.categoria) f.categoria="ternero";
+  if(f.tipo==="tacto" && !f.resultado) return "Marcá el resultado del tacto";
+  if(f.tipo==="cc" && !f.valor) return "Marcá la condición corporal";
+  if((f.tipo==="destete"||f.tipo==="pesada") && num(f.peso)==null) return "Falta el peso";
+  if(f.tipo==="sanidad" && !f.tarea) return "Elegí la tarea del plan";
+  if(f.tipo==="novedad" && !f.categoria && !f.obs) return "Contá qué pasa";
+  return "";
+}
+function guardar(){
+  const f=S.f; const err=validar(f); if(err){ toast(err); return; }
+  const r=construir(f); put(r); vibrar();
+  if(f.potrero) S.set.potrero=f.potrero; if(f.lote) S.set.lote=f.lote; persist();
+  const serie=["tacto","cc","destete","pesada"].includes(f.tipo) && !S.editId;
+  if(serie){
+    S.serie.push(r.id);
+    S.f={tipo:f.tipo, fecha:f.tipo==="destete"||f.tipo==="pesada"?f.fecha:nowLocal(), lote:f.lote, categoria:f.categoria, momento:f.momento, animalTipo:f.animalTipo, potrero:f.potrero, sexo:""};
+    toast(r.tipo==="tacto"?`Guardada: ${r.resultado==="vacia"?"vacía":r.resultado}`:"Guardado");
+    render(); setTimeout(()=>{ const el=$("#in-animal"); el&&el.focus(); },50);
+    return;
+  }
+  if(f.tipo==="parto" && !S.editId){
+    toast(`Parto guardado${r.ident==="prov"?" · ternero "+r.animal:""}`);
+    S.f=null; nuevo("parto",{potrero:f.potrero,lote:f.lote,madreTipo:f.madreTipo});
+    return;
+  }
+  toast(S.editId?"Cambios guardados":"Guardado");
+  S.f=null; S.editId=null; S.view="home"; render();
+}
+
+/* ====================== pantallas ====================== */
+function renderHome(){
+  const ev=eventos(), hoy=todayStr();
+  const hoyEv=ev.filter(e=>(e.fecha||"").startsWith(hoy));
+  const partos=hoyEv.filter(e=>e.tipo==="parto");
+  if(S.tab==="campo") return `${banners()}
+    <h1>Campo</h1>
+    <div class="grid">
+      <button class="big dark wide" data-new="parto"><b>Parto</b><span>Madre, sexo, vivo o muerto, potrero</span></button>
+      <button class="big" data-new="muerte"><b>Muerte</b><span>Vaca, ternero o toro</span></button>
+      <button class="big" data-new="novedad"><b>Novedad</b><span>Aguada, alambrado, enfermo…</span></button>
+    </div>
+    <h2>Hoy</h2>
+    <div class="card">${partos.length?`<div class="chips" style="margin-bottom:8px"><span class="chip ok">${partos.length} partos</span><span class="chip">${partos.filter(p=>p.sexo==="M").length} M</span><span class="chip">${partos.filter(p=>p.sexo==="H").length} H</span>${partos.filter(p=>p.estado==="muerto").length?`<span class="chip bad">${partos.filter(p=>p.estado==="muerto").length} muertos</span>`:""}</div>`:""}
+      ${hoyEv.length?`<div class="list">${hoyEv.sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,12).map(rowEv).join("")}</div>`:`<p class="muted" style="margin:0">Todavía no cargaste nada hoy.</p>`}
+      ${hoyEv.length?`<button class="btn block" style="margin-top:10px" data-share="hoy">Copiar resumen del día</button>`:""}
+    </div>`;
+  if(S.tab==="manga") return `${banners()}
+    <h1>Manga</h1>
+    <p class="muted small">Carga en serie: identificás el animal, marcás el resultado y pasa solo al siguiente. Funciona con bastón lector.</p>
+    <div class="grid">
+      <button class="big dark" data-new="tacto"><b>Tacto</b><span>Cabeza, cuerpo, cola, vacía</span></button>
+      <button class="big" data-new="cc"><b>Condición corporal</b><span>1 a 5 por animal</span></button>
+      <button class="big" data-new="destete"><b>Destete</b><span>Peso y sexo</span></button>
+      <button class="big" data-new="pesada"><b>Pesada</b><span>Cualquier categoría</span></button>
+      <button class="big" data-new="toro"><b>Toros</b><span>CE, aptitud, venéreas</span></button>
+      <button class="big" data-new="sanidad"><b>Sanidad</b><span>Vacuna o tarea del plan</span></button>
+    </div>`;
+  return renderOficina();
+}
+function banners(){
+  let h="";
+  if(!S.set.api) h+=`<div class="banner"><b>Sin servidor configurado.</b> Lo que cargues queda guardado en este celular. Configuralo en Oficina → Ajustes.</div>`;
+  else if(S.syncState==="err") h+=`<div class="banner"><b>No se pudo subir.</b> ${esc(S.syncErr)}. Los datos siguen guardados en el celular.</div>`;
+  return h;
+}
+function rowEv(e){
+  const t=TIPOS[e.tipo]?.n||e.tipo;
+  let d="";
+  if(e.tipo==="parto") d=`Madre ${e.madre?fmtEID(e.madre):"sin ident."} · ${e.sexo||"?"} · ${e.estado}${e.peso?" · "+e.peso+" kg":""}`;
+  else if(e.tipo==="tacto") d=`${e.animal?fmtEID(e.animal):"s/i"} · ${e.resultado}`;
+  else if(e.tipo==="muerte") d=`${e.categoria||""} ${e.animal?fmtEID(e.animal):""} · ${e.causa||"sin causa"}`;
+  else if(e.tipo==="sanidad") d=`${e.detalle||""}${e.cantidad?" · "+e.cantidad+" animales":""}`;
+  else if(e.tipo==="toro") d=`${fmtEID(e.animal)} · ${e.resultado}`;
+  else if(e.tipo==="novedad") d=`${e.categoria||""} ${e.obs?"· "+e.obs.slice(0,50):""}`;
+  else d=`${e.animal?fmtEID(e.animal):""} ${serieTxt(e)}`;
+  const pend=S.outbox[e.id];
+  return `<div class="item"><span class="grow"><b>${t}${e.potrero?` <span class="small muted">· ${esc(e.potrero)}</span>`:""}</b><span class="small muted">${esc(d)}</span></span><span class="small muted" style="text-align:right">${fmtDT(e.fecha).slice(-5)}${pend?`<br><span class="chip warn">sin subir</span>`:""}</span><button class="chip" data-edit="${e.id}">Editar</button></div>`;
+}
+
+function renderForm(){
+  const f=S.f;
+  const body = f.tipo==="parto"?formParto(f): f.tipo==="muerte"?formMuerte(f): f.tipo==="novedad"?formNovedad(f): f.tipo==="toro"?formToro(f): f.tipo==="sanidad"?formSanidad(f): formSerie(f);
+  return `<button class="back" data-back="1">← Volver</button>${body}${S.editId?`<button class="btn danger block" data-del="${S.editId}" style="margin-top:8px">Borrar este registro</button>`:""}`;
+}
+function renderSavebar(){
+  const sb=$("#savebar");
+  if(S.view!=="form"||!S.f){ sb.innerHTML=""; return; }
+  const t=S.f.tipo, label=S.editId?"Guardar cambios":t==="tacto"?"Guardar y siguiente":["cc","destete","pesada"].includes(t)?"Guardar y siguiente":"Guardar";
+  if(t==="tacto"&&!S.editId){ sb.innerHTML=`<div class="savebar"><div class="in"><button class="btn block" data-back="1">Terminar tanda</button></div></div>`; return; }
+  sb.innerHTML=`<div class="savebar"><div class="in"><button class="btn solid" data-save="1">${label}</button></div></div>`;
+}
+
+/* ====================== oficina ====================== */
+function renderOficina(){
+  const tabs=[["resumen","Resumen"],["indicadores","Indicadores"],["calendario","Calendario"],["datos","Datos"],["ajustes","Ajustes"]];
+  const head=`${banners()}<div class="subtabs">${tabs.map(([k,l])=>`<button data-sub="${k}" aria-current="${S.sub===k?"page":"false"}">${l}</button>`).join("")}</div>`;
+  const b = S.sub==="indicadores"?renderIndicadores(): S.sub==="calendario"?renderCalendario(): S.sub==="datos"?renderDatos(): S.sub==="ajustes"?renderAjustes(): renderResumen();
+  return head+b;
+}
+
+/* ----- intérprete de preguntas escritas ----- */
+function parseQuery(q){
+  const s=norm(q), F={tipos:[]}, why=[];
+  const add=(t,l)=>{ if(!F.tipos.includes(t)){ F.tipos.push(t); why.push(l); } };
+  if(/part|naci|paricion|parieron/.test(s)) add("parto","partos");
+  if(/tact|prenez|prenad/.test(s)) add("tacto","tacto");
+  if(/destet/.test(s)) add("destete","destete");
+  if(/pesad/.test(s)) add("pesada","pesadas");
+  if(/\btoro/.test(s)) add("toro","toros");
+  if(/\bcc\b|condicion/.test(s)) add("cc","condición corporal");
+  if(/vacun|sanid|tratam|desparasit/.test(s)) add("sanidad","sanidad");
+  if(/novedad/.test(s)) add("novedad","novedades");
+  if(/muert|mortand|baja/.test(s)){
+    if(F.tipos.includes("parto")){ F.estado="muerto"; why.push("muertos"); }
+    else if(/ternero/.test(s)){ F.tipos.push("parto","muerte"); F.muertoTernero=true; why.push("terneros muertos (al parto y después)"); }
+    else add("muerte","muertes");
+  }
+  if(/\bvivo/.test(s)){ F.estado="vivo"; why.push("vivos"); }
+  if(/\bvacia/.test(s)){ F.resultado="vacia"; if(!F.tipos.length) add("tacto","tacto"); why.push("vacías"); }
+  ["cabeza","cuerpo","cola"].forEach(k=>{ if(new RegExp("\\b"+k+"\\b").test(s) && !/por /.test(s.split(k)[0].slice(-4))){ F.resultado=k; why.push(k); } });
+  const mach=/\bmach/.test(s), hem=/\bhembr/.test(s); if(mach&&!hem){F.sexo="M";why.push("machos");} if(hem&&!mach){F.sexo="H";why.push("hembras");}
+  let m;
+  const valorDe=(pal)=>{ for(const x of s.matchAll(new RegExp(pal+"\\s+([a-z0-9-]+)","g"))){ if(s.slice(Math.max(0,x.index-4),x.index)!=="por ") return x[1]; } return null; };
+  let pv; if((pv=valorDe("potrero"))){ F.potrero=pv; why.push("potrero "+pv); }
+  if((pv=valorDe("lote"))){ F.lote=pv; why.push("lote "+pv); }
+  if((m=s.match(/(?:madre|vaca|caravana|animal)\s+([0-9a-z-]{2,})/))){ F.animal=m[1].toUpperCase(); why.push("animal "+m[1]); }
+  // tiempo
+  const d=new Date(), Y=d.getFullYear(), ymd=x=>`${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`;
+  if(/\bhoy\b/.test(s)){ F.desde=F.hasta=ymd(d); why.push("hoy"); }
+  else if(/\bayer\b/.test(s)){ const x=new Date(d); x.setDate(x.getDate()-1); F.desde=F.hasta=ymd(x); why.push("ayer"); }
+  else if((m=s.match(/ultim[oa]s?\s+(\d+)\s+dias/))){ const x=new Date(d); x.setDate(x.getDate()-Number(m[1])+1); F.desde=ymd(x); F.hasta=ymd(d); why.push(`últimos ${m[1]} días`); }
+  else if(/esta semana|ultima semana/.test(s)){ const x=new Date(d); x.setDate(x.getDate()-6); F.desde=ymd(x); F.hasta=ymd(d); why.push("últimos 7 días"); }
+  else if(/este mes/.test(s)){ F.desde=`${Y}-${pad(d.getMonth()+1)}-01`; F.hasta=ymd(d); why.push("este mes"); }
+  else if(/mes pasado/.test(s)){ const x=new Date(Y,d.getMonth()-1,1), z=new Date(Y,d.getMonth(),0); F.desde=ymd(x); F.hasta=ymd(z); why.push("mes pasado"); }
+  else {
+    const ms=MESES_L.map((n,i)=>s.includes(n)||s.includes(n.slice(0,3)+" ")?i:-1).filter(i=>i>=0);
+    const ym=s.match(/\b(20\d\d)\b/); const camp=s.match(/campana\s+(20\d\d)/);
+    if(camp){ F.campana=Number(camp[1]); why.push("campaña "+camp[1]); }
+    else if(ms.length){ const a=Math.min(...ms), b=Math.max(...ms); let yy=ym?Number(ym[1]):(a>d.getMonth()?Y-1:Y); F.desde=`${yy}-${pad(a+1)}-01`; F.hasta=ymd(new Date(yy,b+1,0)); why.push(ms.length>1?`${MESES_L[a]} a ${MESES_L[b]} ${yy}`:`${MESES_L[a]} ${yy}`); }
+    else if(ym){ F.desde=`${ym[1]}-01-01`; F.hasta=`${ym[1]}-12-31`; why.push("año "+ym[1]); }
+  }
+  const g=s.match(/por\s+(dia|semana|mes|potrero|lote|sexo|estado|resultado|operario|causa|categoria|dificultad|madre|tipo|campana)/);
+  if(g){ F.grupo=g[1]==="campana"?"campana":g[1]; why.push("agrupado por "+g[1]); }
+  return {F, why};
+}
+function filtrar(F){
+  return eventos().filter(e=>{
+    if(F.tipos&&F.tipos.length&&!F.tipos.includes(e.tipo)) return false;
+    if(F.muertoTernero && !((e.tipo==="parto"&&e.estado==="muerto")||(e.tipo==="muerte"&&e.categoria==="ternero"))) return false;
+    const fd=(e.fecha||"").slice(0,10);
+    if(F.desde&&fd<F.desde) return false; if(F.hasta&&fd>F.hasta) return false;
+    if(F.campana&&campOf(e)!==F.campana) return false;
+    if(F.sexo&&e.sexo!==F.sexo) return false;
+    if(F.estado&&e.estado!==F.estado) return false;
+    if(F.resultado&&e.resultado!==F.resultado) return false;
+    if(F.potrero&&norm(e.potrero)!==norm(F.potrero)) return false;
+    if(F.lote&&norm(e.lote)!==norm(F.lote)) return false;
+    if(F.operario&&norm(e.operario)!==norm(F.operario)) return false;
+    if(F.animal&&!(String(e.animal).includes(F.animal)||String(e.madre||"").includes(F.animal))) return false;
+    return true;
+  }).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+}
+function ordenKey(k){ const m=String(k).match(/(\d\d)\/(\d\d)\/(\d\d)/); return m?m[3]+m[2]+m[1]:String(k); }
+const ordenar = ks => ks.sort((a,b)=>ordenKey(a).localeCompare(ordenKey(b),"es",{numeric:true}));
+function claveGrupo(e,g){
+  const fd=(e.fecha||"").slice(0,10);
+  if(g==="dia") return fd; if(g==="mes") return fd.slice(0,7);
+  if(g==="semana"){ const d=new Date(fd+"T12:00"); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return "Sem. "+fmtD(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`); }
+  if(g==="tipo") return TIPOS[e.tipo]?.pl||e.tipo;
+  if(g==="campana") return "Campaña "+campOf(e);
+  if(g==="dificultad") return (DIFIC.find(x=>x[0]===String(e.dificultad))||["","Sin dato"])[1];
+  const v=e[g]; return v==null||v===""?"Sin dato":String(v);
+}
+function metricas(rs){
+  const tipos=[...new Set(rs.map(r=>r.tipo))], t=tipos.length===1?tipos[0]:null;
+  const cols=[["n","Registros",r=>r.length]];
+  if(t==="parto") cols.push(["M","Machos",r=>r.filter(x=>x.sexo==="M").length],["H","Hembras",r=>r.filter(x=>x.sexo==="H").length],["mu","Muertos",r=>r.filter(x=>x.estado==="muerto").length],["mp","% muertos",r=>f1(pct(r.filter(x=>x.estado==="muerto").length,r.length))],["pn","Peso nac.",r=>{const w=r.map(x=>num(x.peso)).filter(x=>x!=null);return w.length?f1(w.reduce((a,b)=>a+b,0)/w.length):"—";}]);
+  if(t==="tacto") cols.push(["pr","% preñez",r=>f1(pct(r.filter(x=>x.resultado!=="vacia").length,r.length))],["ca","Cabeza",r=>r.filter(x=>x.resultado==="cabeza").length],["cu","Cuerpo",r=>r.filter(x=>x.resultado==="cuerpo").length],["co","Cola",r=>r.filter(x=>x.resultado==="cola").length],["va","Vacías",r=>r.filter(x=>x.resultado==="vacia").length]);
+  if(t==="destete"||t==="pesada") cols.push(["pp","Peso prom.",r=>{const w=r.map(x=>num(x.peso)).filter(x=>x!=null);return w.length?f0(w.reduce((a,b)=>a+b,0)/w.length):"—";}],["kg","Kg totales",r=>f0(r.reduce((a,x)=>a+(num(x.peso)||0),0))]);
+  if(t==="cc") cols.push(["cc","CC prom.",r=>{const w=r.map(x=>num(x.valor)).filter(x=>x!=null);return w.length?f1(w.reduce((a,b)=>a+b,0)/w.length):"—";}],["lo","CC < 2,5",r=>r.filter(x=>num(x.valor)<2.5).length]);
+  if(t==="toro") cols.push(["ap","Aptos",r=>r.filter(x=>x.resultado==="apto").length],["na","No aptos",r=>r.filter(x=>x.resultado==="no apto").length]);
+  if(t==="sanidad") cols.push(["an","Animales",r=>f0(r.reduce((a,x)=>a+(num(x.cantidad)||(x.lista?x.lista.length:0)),0))]);
+  return cols;
+}
+function renderResumen(){
+  if(!S.filt){ S.filt={tipos:["parto"], desde:"", hasta:"", grupo:"dia"}; }
+  const F=S.filt, rs=filtrar(F), cols=metricas(rs);
+  const g=F.grupo||"";
+  const grupos={}; if(g) rs.forEach(e=>{ const k=claveGrupo(e,g); (grupos[k]=grupos[k]||[]).push(e); });
+  const keys=ordenar(Object.keys(grupos));
+  const pots=[...new Set(eventos().map(e=>e.potrero).filter(Boolean))].sort();
+  const lotes=[...new Set(eventos().map(e=>e.lote).filter(Boolean))].sort();
+  return `<h1>Resumen</h1>
+  <div class="card">
+    <div class="field"><label>Preguntá escribiendo</label>
+      <div style="display:flex;gap:8px"><input type="search" id="q" value="${esc(S.q)}" placeholder="Ej: partos de septiembre por potrero" enterkeyhint="search"><button class="btn solid" data-ask="1">Ver</button></div>
+      ${S.why&&S.why.length?`<div class="chips">${S.why.map(w=>`<span class="chip plan">${esc(w)}</span>`).join("")}</div>`:`<span class="small muted">Probá: "muertos de ternero este mes por causa", "tacto campaña 2026 por lote", "partos últimos 7 días machos".</span>`}
+    </div>
+    <details ${S.why&&S.why.length?"":"open"}><summary>Filtros</summary>
+      <div class="field"><label>Qué</label><div class="chips">${Object.entries(TIPOS).map(([k,v])=>`<button class="chip ${F.tipos.includes(k)?"ok":""}" data-ft="${k}">${v.pl}</button>`).join("")}</div></div>
+      <div class="row2">${fld("Desde",`<input type="date" data-filt="desde" value="${F.desde||""}">`)}${fld("Hasta",`<input type="date" data-filt="hasta" value="${F.hasta||""}">`)}</div>
+      <div class="row2">${fld("Potrero",`<select data-filt="potrero"><option value="">Todos</option>${pots.map(p=>`<option ${F.potrero===p?"selected":""}>${esc(p)}</option>`).join("")}</select>`)}${fld("Lote",`<select data-filt="lote"><option value="">Todos</option>${lotes.map(p=>`<option ${F.lote===p?"selected":""}>${esc(p)}</option>`).join("")}</select>`)}</div>
+      ${fld("Agrupar por",`<select data-filt="grupo"><option value="">Sin agrupar</option>${[["dia","Día"],["semana","Semana"],["mes","Mes"],["campana","Campaña"],["potrero","Potrero"],["lote","Lote"],["sexo","Sexo"],["estado","Estado"],["resultado","Resultado"],["causa","Causa"],["categoria","Categoría"],["dificultad","Dificultad"],["operario","Operario"],["tipo","Tipo"]].map(([v,l])=>`<option value="${v}" ${g===v?"selected":""}>${l}</option>`).join("")}</select>`)}
+    </details>
+  </div>
+  <div class="kpis">${cols.map(([k,l,fn])=>`<div class="kpi"><span>${l}</span><b>${fn(rs)}</b></div>`).join("")}</div>
+  ${g&&keys.length?`<div class="card scroll"><table><thead><tr><th>${esc(g)}</th>${cols.map(c=>`<th>${c[1]}</th>`).join("")}</tr></thead><tbody>${keys.map(k=>`<tr><td>${esc(k)}</td>${cols.map(c=>`<td>${c[2](grupos[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:""}
+  ${g&&keys.length>1&&keys.length<=40?`<div class="card">${barras(keys.map(k=>[k,grupos[k].length]))}</div>`:""}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" data-share="filt">Copiar para WhatsApp</button><button class="btn" data-csv="1">Descargar planilla (CSV)</button></div>
+  <div class="card"><h3 style="margin-top:0">${rs.length} registros</h3><div class="list">${rs.slice(0,60).map(rowEv).join("")}</div>${rs.length>60?`<p class="small muted">Se muestran los últimos 60. Descargá la planilla para ver todo.</p>`:""}</div>`;
+}
+function barras(pares){
+  const max=Math.max(...pares.map(p=>p[1]),1);
+  return pares.map(([k,v])=>`<div style="display:grid;grid-template-columns:110px 1fr 40px;gap:8px;align-items:center;margin:4px 0;font-size:14px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k)}</span><div class="bar" style="width:${Math.max(2,v/max*100)}%"></div><b style="text-align:right">${v}</b></div>`).join("");
+}
+function textoResumen(rs,titulo){
+  const cols=metricas(rs), E=estab();
+  let t=`*${E.nombre} · ${titulo}*\n`;
+  t+=cols.map(([k,l,fn])=>`${l}: ${fn(rs)}`).join(" · ")+"\n";
+  const g=S.filt&&S.filt.grupo;
+  if(g&&titulo!=="hoy"){ const gr={}; rs.forEach(e=>{ const k=claveGrupo(e,g); (gr[k]=gr[k]||[]).push(e); }); ordenar(Object.keys(gr)).forEach(k=>{ t+=`- ${k}: ${cols.slice(1,4).map(([kk,l,fn])=>`${l} ${fn(gr[k])}`).join(", ")||gr[k].length}\n`; }); }
+  return t+"_Rodeo de cría · APSAVET_";
+}
+async function copiar(txt){ try{ await navigator.clipboard.writeText(txt); toast("Copiado. Pegalo en WhatsApp."); }catch(_){ S.copyTxt=txt; render(); window.scrollTo(0,0); } }
+function csv(rs){
+  const cols=["fecha","tipo","campana","animal","ident","sena","madre","madreIdent","madreSena","sexo","estado","resultado","valor","peso","dificultad","causa","categoria","potrero","lote","detalle","producto","cantidad","ce","aptitud","tricho","campylo","operario","obs","lat","lng"];
+  const q=v=>{ v=v==null?"":String(v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const body=[cols.join(";")].concat(rs.map(r=>cols.map(c=>q(c==="campana"?campOf(r):r[c])).join(";"))).join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+body],{type:"text/csv"})); a.download=`rodeo-cria-${S.set.estab}-${todayStr()}.csv`; a.click();
+}
+
+/* ----- indicadores por campaña ----- */
+function campanias(){ const s=new Set(eventos().map(campOf).filter(Boolean)); Object.keys(estab().campanas||{}).forEach(c=>s.add(Number(c))); const y=new Date().getFullYear(); s.add(new Date().getMonth()>=9?y:y-1); return [...s].sort((a,b)=>b-a); }
+function calcCamp(c){
+  const E=estab(), cfg=E.campanas[c]||{}, ev=eventos().filter(e=>campOf(e)===c);
+  const tac=ev.filter(e=>e.tipo==="tacto"), par=ev.filter(e=>e.tipo==="parto"), des=ev.filter(e=>e.tipo==="destete"), mt=ev.filter(e=>e.tipo==="muerte"&&e.categoria==="ternero");
+  const pre=tac.filter(e=>e.resultado!=="vacia").length, vac=tac.length-pre, cab=tac.filter(e=>e.resultado==="cabeza").length, cue=tac.filter(e=>e.resultado==="cuerpo").length, col=tac.filter(e=>e.resultado==="cola").length;
+  const vientres=(num(cfg.vacas)||0)+(num(cfg.vaquillonas)||0) || tac.length || null;
+  const muertosP=par.filter(e=>e.estado==="muerto").length, vivos=par.length-muertosP;
+  const pesos=des.map(e=>num(e.peso)).filter(x=>x!=null), kgDest=pesos.reduce((a,b)=>a+b,0);
+  const toros=num(cfg.toros);
+  return {c,cfg,vientres,tac:tac.length,pre,vac,cab,cue,col,partos:par.length,vivos,muertosP,machos:par.filter(e=>e.sexo==="M").length,hembras:par.filter(e=>e.sexo==="H").length,dist:par.filter(e=>Number(e.dificultad)>=3).length,
+    mt:mt.length,dest:des.length,pesoDest:pesos.length?kgDest/pesos.length:null,kgDest,
+    prenez:pct(pre,tac.length),pcab:pct(cab,pre),paricion:pct(par.length,vientres),mortPeri:pct(muertosP,par.length),mortDest:pct(mt.length,vivos),destete:pct(des.length,vientres),kgVaca:vientres&&pesos.length?kgDest/vientres:null,perdida:pre?pct(pre-par.length,pre):null,torosPct:pct(toros,vientres),par};
+}
+function sem(v,meta,mayor=true){ if(v==null) return ""; const ok=mayor?v>=meta:v<=meta, cerca=mayor?v>=meta*0.93:v<=meta*1.5; return ok?"ok":cerca?"warn":"bad"; }
+function renderIndicadores(){
+  const cs=campanias(); if(!S.campSel||!cs.includes(S.campSel)) S.campSel=cs[0];
+  const c=S.campSel, k=calcCamp(c), M=estab().metas;
+  const kp=(l,v,unit,cls,sub)=>`<div class="kpi ${cls}"><span>${l}</span><b>${v}${v!=="—"?unit:""}</b><small>${sub||""}</small></div>`;
+  return `<h1>Indicadores</h1>
+  <div class="field"><label>Campaña (año del entore)</label>${seg("campSel",cs.map(x=>[x,`${x}/${String(x+1).slice(2)}`]),c)}</div>
+  <div class="card"><h3 style="margin-top:0">Datos de la campaña ${c}/${String(c+1).slice(2)}</h3>
+    <div class="row2">${fld("Vacas entoradas",`<input type="number" inputmode="numeric" data-camp="vacas" value="${k.cfg.vacas??""}">`)}${fld("Vaquillonas entoradas",`<input type="number" inputmode="numeric" data-camp="vaquillonas" value="${k.cfg.vaquillonas??""}">`)}</div>
+    <div class="row2">${fld("Toros en servicio",`<input type="number" inputmode="numeric" data-camp="toros" value="${k.cfg.toros??""}">`)}${fld("Inicio del entore",`<input type="date" data-camp="inicio" value="${k.cfg.inicio??""}">`)}</div>
+    <span class="small muted">El resto sale solo de lo que se carga a campo y en manga.</span>
+  </div>
+  <h2>Reproducción</h2>
+  <div class="kpis">
+    ${kp("Preñez",f1(k.prenez),"%",sem(k.prenez,M.prenez),`${k.pre} de ${k.tac} tactadas · meta ${M.prenez}%`)}
+    ${kp("Preñez cabeza",f1(k.pcab),"%",sem(k.pcab,M.cabeza),`${k.cab} cab · ${k.cue} cue · ${k.col} cola · meta ${M.cabeza}%`)}
+    ${kp("Toros",f1(k.torosPct),"%",k.torosPct==null?"":(k.torosPct>=M.torosMin&&k.torosPct<=M.torosMax?"ok":"warn"),`meta ${M.torosMin}–${M.torosMax}%`)}
+    ${kp("Pérdida preñez → parto",f1(k.perdida),"%",k.perdida==null?"":k.perdida<=5?"ok":"warn",`${k.pre} preñadas · ${k.partos} partos`)}
+  </div>
+  <h2>Parición</h2>
+  <div class="kpis">
+    ${kp("Partos",f0(k.partos),"","",`${k.machos} M · ${k.hembras} H`)}
+    ${kp("Parición",f1(k.paricion),"%","",`sobre ${k.vientres??"—"} vientres`)}
+    ${kp("Mortandad perinatal",f1(k.mortPeri),"%",sem(k.mortPeri,M.mortPeri,false),`${k.muertosP} muertos · meta < ${M.mortPeri}%`)}
+    ${kp("Partos con ayuda fuerte",f1(pct(k.dist,k.partos)),"%","",`${k.dist} partos`)}
+  </div>
+  ${k.partos?`<div class="card"><h3 style="margin-top:0">Distribución de la parición</h3>${curvaParicion(k)}</div>`:""}
+  <h2>Destete</h2>
+  <div class="kpis">
+    ${kp("Destete",f1(k.destete),"%",sem(k.destete,M.destete),`${k.dest} destetados · meta ${M.destete}%`)}
+    ${kp("Peso al destete",f0(k.pesoDest)," kg","","promedio")}
+    ${kp("Kg destetados / vaca entorada",f0(k.kgVaca)," kg",sem(k.kgVaca,M.kgVaca),`meta ${M.kgVaca} kg`)}
+    ${kp("Mortandad parto → destete",f1(k.mortDest),"%",sem(k.mortDest,M.mortDest,false),`${k.mt} terneros`)}
+  </div>
+  ${compararCamp(cs)}
+  <button class="btn" data-share="camp">Copiar indicadores para WhatsApp</button>`;
+}
+function curvaParicion(k){
+  const sem={}; k.par.forEach(e=>{ const key=claveGrupo(e,"semana"); sem[key]=(sem[key]||0)+1; });
+  const ks=ordenar(Object.keys(sem));
+  let acc=0; const tot=k.pre||k.partos;
+  return `<div class="scroll"><table><thead><tr><th>Semana</th><th>Partos</th><th>Acumulado</th><th>% de preñadas</th></tr></thead><tbody>${ks.map(s=>{ acc+=sem[s]; return `<tr><td>${s}</td><td>${sem[s]}</td><td>${acc}</td><td>${f1(pct(acc,tot))}%</td></tr>`; }).join("")}</tbody></table></div>
+  <p class="small muted">Según el tacto se esperaban ${k.cab} partos en la cabeza, ${k.cue} en el cuerpo y ${k.col} en la cola.</p>`;
+}
+function compararCamp(cs){
+  if(cs.length<2) return "";
+  const rows=cs.slice(0,5).map(calcCamp);
+  const L=[["Preñez %","prenez",f1],["Cabeza %","pcab",f1],["Mortandad perinatal %","mortPeri",f1],["Destete %","destete",f1],["Kg / vaca entorada","kgVaca",f0]];
+  return `<h2>Comparación entre campañas</h2><div class="card scroll"><table><thead><tr><th>Indicador</th>${rows.map(r=>`<th>${r.c}/${String(r.c+1).slice(2)}</th>`).join("")}</tr></thead><tbody>${L.map(([l,k,fn])=>`<tr><td>${l}</td>${rows.map(r=>`<td>${fn(r[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+/* ----- calendario de procesos ----- */
+function hechoEn(tid,y,m){
+  return eventos().some(e=>{ const fy=Number((e.fecha||"").slice(0,4)), fm=Number((e.fecha||"").slice(5,7)); if(fy!==y||fm!==m) return false;
+    if(e.tipo==="sanidad") return e.tarea===tid;
+    return (tid==="paricion"&&e.tipo==="parto")||(tid==="tacto"&&e.tipo==="tacto")||(tid==="destete"&&e.tipo==="destete")||(tid==="x-raspaje"&&e.tipo==="toro"); });
+}
+function renderCalendario(){
+  const E=estab(), y=S.calYear, now=new Date(), curY=now.getFullYear(), curM=now.getMonth()+1;
+  let plan=0, hecho=0, atras=0; const pend=[];
+  const filas=E.plan.map(t=>{
+    const cells=[]; for(let m=1;m<=12;m++){
+      const p=Object.prototype.hasOwnProperty.call(t.meses,m), h=hechoEn(t.id,y,m);
+      const pasado = y<curY || (y===curY && m<curM);
+      let cls="", tx=p?(t.meses[m]||"•"):"";
+      if(p){ if(pasado||(y===curY&&m===curM)){ plan++; if(h) hecho++; } if(h) cls="done"; else if(pasado){ cls="late"; atras++; } else cls="plan"; if(!h && y===curY && (m===curM||m===curM+1)) pend.push([t,m,0]); if(!h&&pasado&&y===curY&&m>=curM-3) pend.push([t,m,1]); }
+      else if(h){ cls="extra"; tx="✓"; }
+      cells.push(`<td>${cls?`<button class="cell ${cls}" data-cal="${t.id}|${m}" title="${esc(t.nombre)} · ${MESES[m-1]}">${esc(tx)}</button>`:""}</td>`);
+    }
+    return [t, cells.join("")];
+  });
+  let lastG="";
+  const rows=filas.map(([t,c])=>{ const g=t.grupo!==lastG?`<tr><td colspan="13" style="background:#EEF2F1;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em">${esc(t.grupo)}</td></tr>`:""; lastG=t.grupo; return g+`<tr><td>${esc(t.nombre)}</td>${c}</tr>`; }).join("");
+  const cumpl=pct(hecho,plan);
+  return `<h1>Calendario de procesos</h1>
+  <div class="field">${seg("calYear",[curY-1,curY,curY+1].map(v=>[v,v]),y)}</div>
+  <div class="kpis"><div class="kpi ${sem(cumpl,90)}"><span>Cumplimiento a la fecha</span><b>${f0(cumpl)}${cumpl==null?"":"%"}</b><small>${hecho} de ${plan} tareas</small></div><div class="kpi ${atras?"bad":"ok"}"><span>Atrasadas</span><b>${atras}</b><small>sin registrar</small></div></div>
+  ${pend.length&&y===curY?`<div class="card"><h3 style="margin-top:0">Para hacer o registrar</h3><div class="list">${pend.sort((a,b)=>b[2]-a[2]||a[1]-b[1]).slice(0,14).map(([t,m])=>`<div class="item"><span class="grow"><b>${esc(t.nombre)}</b><span class="small muted">${esc(t.grupo)} · ${MESES_L[m-1]}${t.meses[m]?" · "+t.meses[m]+" dosis":""}</span></span><button class="chip ${m<curM?"bad":"plan"}" data-cal="${t.id}|${m}">Registrar</button></div>`).join("")}</div></div>`:""}
+  <div class="card scroll"><table class="cal"><thead><tr><th>Tarea</th>${MESES.map(m=>`<th>${m}</th>`).join("")}</tr></thead><tbody>
+    <tr><td>Oferta de pasto</td>${PASTO.oferta.map(v=>`<td><span style="display:block;height:${v*6}px;background:#97BC62;border-radius:3px;margin:auto;width:70%"></span></td>`).join("")}</tr>
+    <tr><td>Requerimientos</td>${PASTO.req.map(v=>`<td><span style="display:block;height:${v*6}px;background:#C98A00;border-radius:3px;margin:auto;width:70%"></span></td>`).join("")}</tr>
+    ${rows}</tbody></table></div>
+  <div class="chips" style="margin-bottom:12px"><span class="chip plan">Planificado</span><span class="chip ok">Hecho</span><span class="chip bad">Atrasado</span></div>
+  <details><summary>Editar el plan de este establecimiento</summary>${editorPlan(E)}</details>`;
+}
+function editorPlan(E){
+  return `<div class="card scroll"><table class="cal"><thead><tr><th>Tarea</th>${MESES.map(m=>`<th>${m}</th>`).join("")}<th></th></tr></thead><tbody>${E.plan.map((t,i)=>`<tr><td>${esc(t.grupo)} · ${esc(t.nombre)}</td>${MESES.map((_,j)=>`<td><input type="checkbox" data-plan="${i}|${j+1}" ${Object.prototype.hasOwnProperty.call(t.meses,j+1)?"checked":""} style="width:22px;height:22px"></td>`).join("")}<td><button class="chip bad" data-plandel="${i}">✕</button></td></tr>`).join("")}</tbody></table></div>
+  <div class="row2">${fld("Grupo",`<select id="np-g">${["Reproductivo","Vacas","Vaquillonas","Terneros","Toros","Desparasitación","Diagnóstico"].map(g=>`<option>${g}</option>`).join("")}</select>`)}${fld("Nueva tarea",`<input type="text" id="np-n" placeholder="Ej. Vitamina A, D, E">`)}</div>
+  <button class="btn" data-planadd="1">Agregar tarea</button>`;
+}
+
+/* ----- datos: listado, vincular terneros, importar bastón ----- */
+function renderDatos(){
+  const ev=eventos().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  const prov=ev.filter(e=>e.tipo==="parto"&&e.ident==="prov"&&e.estado!=="muerto");
+  return `<h1>Datos</h1>
+  <div class="card"><h3 style="margin-top:0">Importar lectura del bastón</h3>
+    <p class="small muted" style="margin-top:0">Archivo de texto o CSV que exporta el bastón (caravanas de 15 dígitos y, si tiene, pesos).</p>
+    <input type="file" id="imp-file" accept=".csv,.txt,text/plain,text/csv">
+    ${S.imp?renderImport():""}
+  </div>
+  ${prov.length?`<div class="card"><h3 style="margin-top:0">Terneros sin caravana (${prov.length})</h3><p class="small muted" style="margin-top:0">Cuando se les pone la caravana, escribila o leela con el bastón y se vincula el registro del parto.</p>
+    <div class="list">${prov.slice(0,30).map(e=>`<div class="item"><span class="grow"><b>${esc(e.animal)}</b><span class="small muted">${fmtD(e.fecha)} · ${e.sexo} · madre ${e.madre?fmtEID(e.madre):esc(e.madreSena||"s/i")}</span></span><input type="text" data-vinc="${e.id}" placeholder="Caravana" style="max-width:150px;min-height:44px" inputmode="numeric"></div>`).join("")}</div></div>`:""}
+  <div class="card"><h3 style="margin-top:0">Últimos registros</h3><input type="search" id="buscar" placeholder="Buscar caravana, potrero, lote…" value="${esc(S.buscar||"")}" style="margin-bottom:8px">
+    <div class="list">${ev.filter(e=>!S.buscar||norm(JSON.stringify(e)).includes(norm(S.buscar))).slice(0,80).map(rowEv).join("")}</div></div>`;
+}
+function parseBaston(txt){
+  const rows=[]; const seen=new Set();
+  txt.split(/\r?\n/).forEach(line=>{
+    const m=line.replace(/(\d)[ .](?=\d{3})/g,"$1").match(/\b\d{15}\b/) || line.match(/\b\d{3}\s?\d{12}\b/);
+    if(!m) return; const eid=soloDig(m[0]); if(seen.has(eid)) return; seen.add(eid);
+    const rest=line.replace(m[0],""); const w=(rest.match(/(?:^|[;,\t ])(\d{2,4}(?:[.,]\d)?)(?=$|[;,\t ])/)||[])[1];
+    const fd=(rest.match(/(\d{4}-\d{2}-\d{2})|(\d{2}\/\d{2}\/\d{4})/)||[])[0];
+    rows.push({eid, peso:w?num(w):null, fecha:fd||""});
+  });
+  return rows;
+}
+function renderImport(){
+  const I=S.imp, conPeso=I.rows.filter(r=>r.peso!=null).length;
+  return `<div style="margin-top:12px"><p><b>${I.rows.length} caravanas leídas</b>${conPeso?` · ${conPeso} con peso`:""}</p>
+    ${fld("Qué hacer con esta lectura", seg("impAccion",[["sanidad","Sanidad / vacuna"],["pesada","Pesada"],["destete","Destete"],["tacto","Tacto"]],I.accion,"g2"))}
+    ${I.accion==="sanidad"?fld("Tarea del plan",`<select id="imp-tarea">${estab().plan.map(t=>`<option value="${t.id}">${esc(t.grupo)} · ${esc(t.nombre)}</option>`).join("")}</select>`)+fld("Producto",`<input type="text" id="imp-prod">`):""}
+    <div class="row2">${fld("Fecha",`<input type="date" id="imp-fecha" value="${todayStr()}">`)}${fld("Lote",`<input type="text" id="imp-lote">`)}</div>
+    <button class="btn solid block" data-impok="1">Cargar</button></div>`;
+}
+function aplicarImport(){
+  const I=S.imp, fecha=($("#imp-fecha").value||todayStr())+"T12:00", lote=$("#imp-lote").value.trim();
+  if(I.accion==="sanidad"){
+    const f={tipo:"sanidad", fecha, lote, tarea:$("#imp-tarea").value, producto:$("#imp-prod").value, cantidad:I.rows.length, lista:I.rows.map(r=>r.eid), animalTipo:"sin"};
+    S.editId=null; put(construir(f)); toast(`Sanidad registrada para ${I.rows.length} animales`);
+  } else if(I.accion==="tacto"){
+    S.imp=null; nuevo("tacto",{lote, animalTipo:"eid"}); S.f._cola=I.rows.map(r=>r.eid); S.f.animal=S.f._cola.shift(); render(); toast("Marcá el resultado de cada una"); return;
+  } else {
+    I.rows.forEach(r=>{ S.editId=null; put(construir({tipo:I.accion, fecha:r.fecha?(r.fecha.includes("/")?r.fecha.split("/").reverse().join("-"):r.fecha)+"T12:00":fecha, lote, animal:r.eid, animalTipo:"eid", peso:r.peso})); });
+    toast(`${I.rows.length} registros de ${TIPOS[I.accion].n.toLowerCase()} cargados`);
+  }
+  S.imp=null; render();
+}
+
+/* ----- ajustes ----- */
+function renderAjustes(){
+  const E=estab(), L=listaEstabs(), M=E.metas;
+  return `<h1>Ajustes</h1>
+  <div class="card">${fld("Establecimiento",`<select id="aj-estab">${Object.entries(L).map(([id,n])=>`<option value="${id}" ${id===S.set.estab?"selected":""}>${esc(n)}</option>`).join("")}</select>`)}
+    ${fld("Agregar otro establecimiento",`<div style="display:flex;gap:8px"><input type="text" id="aj-nuevo" placeholder="Nombre"><button class="btn" data-nuevoest="1">Agregar</button></div>`)}
+    ${fld("Tu nombre (quién carga)",`<input type="text" id="aj-op" value="${esc(S.set.operario)}">`)}
+    ${fld("Dirección del servidor",`<input type="url" id="aj-api" value="${esc(S.set.api)}" placeholder="https://script.google.com/macros/s/…/exec">`)}
+    ${fld("Código de acceso",`<input type="text" id="aj-cod" value="${esc(S.set.codigo)}" autocapitalize="off">`)}
+    <button class="btn solid block" data-ajok="1">Guardar ajustes</button></div>
+  <div class="card"><h3 style="margin-top:0">Metas de ${esc(E.nombre)}</h3>
+    <div class="row2">${[["prenez","Preñez %"],["cabeza","Preñez cabeza %"],["mortPeri","Mortandad perinatal %"],["mortDest","Mortandad parto-destete %"],["destete","Destete %"],["kgVaca","Kg destetados / vaca"],["torosMin","Toros mín. %"],["torosMax","Toros máx. %"]].map(([k,l])=>fld(l,`<input type="number" inputmode="decimal" data-meta="${k}" value="${M[k]??""}">`)).join("")}</div></div>
+  <div class="card"><h3 style="margin-top:0">Instalar en el celular</h3><p class="small" style="margin:0">Android (Chrome): menú ⋮ → "Instalar aplicación" o "Agregar a pantalla principal". iPhone (Safari): Compartir → "Agregar a inicio". Una vez instalada funciona sin señal.</p></div>
+  <p class="small muted">Registros en este celular: ${eventos().length} · sin subir: ${Object.keys(S.outbox).length}${S.lastSync?` · última sincronización: ${new Date(S.lastSync).toLocaleString("es-AR")}`:""}</p>`;
+}
+function renderSetup(){
+  return `<h1>Bienvenido</h1><p class="muted">Se configura una sola vez en este celular.</p>
+  <div class="card">
+    ${fld("Tu nombre",`<input type="text" id="su-op" value="${esc(S.set.operario)}" placeholder="Ej. Juan">`)}
+    ${fld("Código de acceso",`<input type="text" id="su-cod" value="${esc(S.set.codigo)}" autocapitalize="off" placeholder="Te lo pasa el asesor">`)}
+    <details ${S.set.api?"":"open"}><summary>Servidor</summary>${fld("Dirección del servidor",`<input type="url" id="su-api" value="${esc(S.set.api)}" placeholder="https://script.google.com/macros/s/…/exec">`,"Si llegaste por el link que te mandaron ya viene cargada.")}</details>
+    <button class="btn solid block" data-setup="1">Empezar</button>
+  </div>`;
+}
+
+/* ====================== render ====================== */
+function render(){
+  const E=estab();
+  $("#h-title").textContent = "Rodeo de cría";
+  $("#h-sub").textContent = `${E.nombre} · ${S.set.operario||"APSAVET"}`;
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===S.tab&&S.view!=="setup"?"page":"false"));
+  $("#tabs").hidden = S.view==="setup";
+  const app=$("#app");
+  app.innerHTML = (S.copyTxt?`<div class="card"><h3 style="margin-top:0">Copiá este texto</h3><textarea readonly style="min-height:160px">${esc(S.copyTxt)}</textarea><button class="btn block" data-copyx="1" style="margin-top:8px">Cerrar</button></div>`:"") + (S.view==="setup"?renderSetup(): S.view==="form"?renderForm(): renderHome());
+  renderSavebar(); renderSync();
+}
+
+/* ====================== eventos ====================== */
+document.addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  const d=b.dataset;
+  if(d.tab){ S.tab=d.tab; S.view="home"; S.f=null; render(); window.scrollTo(0,0); return; }
+  if(b.id==="btn-sync"){ sync(); toast(Object.keys(S.outbox).length?"Subiendo datos…":"Buscando novedades…"); return; }
+  if(d.new){ nuevo(d.new); return; }
+  if(d.back){ S.f=null; S.editId=null; S.view="home"; render(); return; }
+  if(d.save){ guardar(); return; }
+  if(d.edit){ editar(d.edit); return; }
+  if(d.del){ if(!armar(b,"Tocá de nuevo para borrar")) return; const r=S.R[d.del]; if(r){ r.borrado=true; put(r); } S.serie=S.serie.filter(x=>x!==d.del); if(S.editId===d.del){ S.f=null; S.editId=null; S.view="home"; } toast("Borrado"); render(); return; }
+  if(d.sub){ S.sub=d.sub; render(); return; }
+  if(d.set!==undefined){
+    const k=d.set, v=d.v;
+    if(k==="campSel"||k==="calYear"){ S[k]=Number(v); render(); return; }
+    if(k==="impAccion"){ S.imp.accion=v; render(); return; }
+    const f=S.f; if(!f) return;
+    f[k] = (f[k]===v && !["sexo","estado","madreTipo","animalTipo","terneroTipo","categoria","resultado","valor"].includes(k)) ? "" : v;
+    if(k==="resultado"&&f.tipo==="tacto"&&!S.editId){ guardarTactoCola(); return; }
+    const y=window.scrollY; render(); window.scrollTo(0,y);
+    if(/Tipo$/.test(k)){ const el=$("#in-"+k.replace("Tipo","")); el&&el.focus(); }
+    return;
+  }
+  if(d.share){
+    let rs, t;
+    if(d.share==="hoy"){ rs=eventos().filter(x=>(x.fecha||"").startsWith(todayStr())); const pt=rs.filter(x=>x.tipo==="parto"); t=`*${estab().nombre} · ${fmtD(todayStr())}*\nPartos: ${pt.length} (${pt.filter(x=>x.sexo==="M").length} M / ${pt.filter(x=>x.sexo==="H").length} H)${pt.filter(x=>x.estado==="muerto").length?` · muertos: ${pt.filter(x=>x.estado==="muerto").length}`:""}\n`+["muerte","novedad"].map(tp=>{ const x=rs.filter(r=>r.tipo===tp); return x.length?`${TIPOS[tp].pl}: ${x.map(r=>(r.categoria||"")+(r.causa?" ("+r.causa+")":"")+(r.potrero?" en "+r.potrero:"")).join("; ")}\n`:""; }).join("")+`_Cargó: ${S.set.operario||"-"}_`; }
+    else if(d.share==="camp"){ const k=calcCamp(S.campSel); t=`*${estab().nombre} · campaña ${k.c}/${String(k.c+1).slice(2)}*\nPreñez: ${f1(k.prenez)}% (cabeza ${f1(k.pcab)}%)\nPartos: ${k.partos} · mortandad perinatal ${f1(k.mortPeri)}%\nDestete: ${f1(k.destete)}% · ${f0(k.pesoDest)} kg prom · ${f0(k.kgVaca)} kg/vaca entorada\n_Rodeo de cría · APSAVET_`; }
+    else { rs=filtrar(S.filt); t=textoResumen(rs, S.why&&S.why.length?S.why.join(", "):"resumen"); }
+    copiar(t); return;
+  }
+  if(d.csv){ csv(filtrar(S.filt)); return; }
+  if(d.ft){ const T=S.filt.tipos; const i=T.indexOf(d.ft); i>=0?T.splice(i,1):T.push(d.ft); S.why=null; render(); return; }
+  if(d.ask){ preguntar(); return; }
+  if(d.cal){ const [tid,m]=d.cal.split("|"); const y=S.calYear; const fecha = (y===new Date().getFullYear()&&Number(m)===new Date().getMonth()+1) ? nowLocal() : `${y}-${pad(m)}-15T12:00`; S.tab="manga"; nuevo("sanidad",{tarea:tid,fecha}); return; }
+  if(d.planadd){ const E=estab(); const n=$("#np-n").value.trim(); if(!n) return; E.plan.push({id:"u-"+uid(),grupo:$("#np-g").value,nombre:n,meses:{}}); saveEstab(E); render(); return; }
+  if(d.plandel){ if(!armar(b,"¿Quitar?")) return; const E=estab(); E.plan.splice(Number(d.plandel),1); saveEstab(E); render(); return; }
+  if(d.impok){ aplicarImport(); return; }
+  if(d.copyx){ S.copyTxt=null; render(); return; }
+  if(d.ajok){ guardarAjustes(); return; }
+  if(d.nuevoest){ const n=$("#aj-nuevo").value.trim(); if(!n) return; const id=slug(n); S.set.estab=id; if(!estabRec(id)) saveEstab({clase:"config",tipo:"estab",id:"estab-"+id,estab:id,nombre:n,plan:JSON.parse(JSON.stringify(PLAN_BASE)),metas:{...METAS_BASE},campanas:{},potreros:[]}); S.filt=null; persist(); toast("Establecimiento agregado: "+n); render(); return; }
+  if(d.setup){ S.set.operario=$("#su-op").value.trim(); S.set.codigo=$("#su-cod").value.trim(); const a=$("#su-api"); if(a) S.set.api=a.value.trim(); if(!S.set.operario){ toast("Escribí tu nombre"); return; } if(!S.set.estab) S.set.estab=ESTAB_DEFAULT.id; S.view="home"; persist(); render(); sync(); return; }
+});
+// confirmación sin ventanas emergentes: el primer toque arma, el segundo confirma
+function armar(b,txt){ if(b.dataset.armed==="1") return true; b.dataset.armed="1"; const o=b.textContent; b.textContent=txt; setTimeout(()=>{ if(b.isConnected){ b.dataset.armed=""; b.textContent=o; } },3000); return false; }
+function guardarTactoCola(){
+  const f=S.f, cola=f._cola; const err=validar(f); if(err){ toast(err); render(); return; }
+  const r=construir(f); put(r); vibrar(); S.serie.push(r.id);
+  S.f={tipo:"tacto", fecha:nowLocal(), lote:f.lote, categoria:f.categoria, animalTipo:f.animalTipo, potrero:f.potrero, _cola:cola};
+  if(cola&&cola.length) S.f.animal=cola.shift();
+  toast(`${r.animal?fmtEID(r.animal):"Animal"}: ${r.resultado==="vacia"?"vacía":r.resultado}${cola?` · quedan ${cola.length+(S.f.animal?1:0)}`:""}`);
+  render(); setTimeout(()=>{ const el=$("#in-animal"); if(el&&!S.f.animal) el.focus(); },50);
+}
+function preguntar(){
+  const q=$("#q").value; S.q=q; if(!q.trim()) return;
+  const {F,why}=parseQuery(q);
+  if(!F.tipos.length) F.tipos=Object.keys(TIPOS);
+  if(!F.grupo) F.grupo="";
+  S.filt={...F}; S.why=why.length?why:["todo"]; render();
+}
+function guardarAjustes(){
+  const v=$("#aj-estab").value;
+  S.set.operario=$("#aj-op").value.trim(); S.set.api=$("#aj-api").value.trim(); S.set.codigo=$("#aj-cod").value.trim();
+  S.set.estab=v;
+  S.filt=null; S.why=null; persist(); toast("Ajustes guardados"); render(); sync();
+}
+document.addEventListener("input", e=>{
+  const t=e.target, d=t.dataset;
+  if(d.f && S.f){ S.f[d.f]=t.value; if((d.f==="madre"||d.f==="animal"||d.f==="ternero")) marcaBaston(t,d.f); return; }
+  if(t.id==="buscar"){ S.buscar=t.value; clearTimeout(S.bt); S.bt=setTimeout(()=>{ const pos=t.selectionStart; render(); const el=$("#buscar"); el.focus(); el.setSelectionRange(pos,pos); },350); return; }
+});
+document.addEventListener("change", e=>{
+  const t=e.target, d=t.dataset;
+  if(d.f && S.f){ S.f[d.f]=t.value; if(d.f==="tarea"){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
+  if(d.filt){ S.filt[d.filt]=t.value; S.why=null; render(); return; }
+  if(d.camp){ const E=estab(); E.campanas[S.campSel]=E.campanas[S.campSel]||{}; E.campanas[S.campSel][d.camp]=t.type==="number"?num(t.value):t.value; saveEstab(E); render(); return; }
+  if(d.meta){ const E=estab(); E.metas[d.meta]=num(t.value); saveEstab(E); return; }
+  if(d.plan){ const [i,m]=d.plan.split("|").map(Number); const E=estab(); const tk=E.plan[i]; if(t.checked) tk.meses[m]=""; else delete tk.meses[m]; saveEstab(E); return; }
+  if(d.vinc){ const r=S.R[d.vinc]; const v=t.value.trim(); if(!r||!v) return; r.provisorio=r.animal; r.animal=normId(v); r.ident=esEID(v)?"eid":"visual"; put(r); toast("Ternero vinculado a "+fmtEID(r.animal)); render(); return; }
+  if(t.id==="imp-file"&&t.files[0]){ const rd=new FileReader(); rd.onload=()=>{ const rows=parseBaston(String(rd.result)); if(!rows.length){ toast("No encontré caravanas de 15 dígitos en el archivo"); return; } S.imp={rows, accion: rows.some(r=>r.peso!=null)?"pesada":"sanidad"}; render(); }; rd.readAsText(t.files[0]); return; }
+});
+document.addEventListener("keydown", e=>{
+  const t=e.target;
+  if(e.key==="Enter"){
+    if(t.id==="q"){ e.preventDefault(); preguntar(); return; }
+    if(t.dataset && (t.dataset.f==="animal"||t.dataset.f==="madre"||t.dataset.f==="ternero"||t.dataset.f==="peso")){
+      e.preventDefault(); t.blur();
+      if(S.f && ["cc","destete","pesada"].includes(S.f.tipo) && t.dataset.f==="peso"){ guardar(); return; }
+      if(S.f && (S.f.tipo==="destete"||S.f.tipo==="pesada") && t.dataset.f==="animal"){ const p=$("#in-peso"); p&&p.focus(); }
+    }
+  }
+});
+// Detecta lectura del bastón (teclea muy rápido): marca el campo como caravana electrónica
+const tecla={};
+function marcaBaston(el,field){
+  const now=Date.now(), k=tecla[field]||(tecla[field]={t:now,n:0,first:now});
+  if(now-k.t>400){ k.first=now; k.n=0; }
+  k.n++; k.t=now;
+  const v=el.value;
+  if(esEID(v) && soloDig(v).length>=15 && (k.n>=10 && (now-k.first)/k.n<45) && S.f){
+    const tk=field==="ternero"?"terneroTipo":field+"Tipo";
+    if(S.f[tk]!=="eid"){ S.f[tk]="eid"; S.f[field]=soloDig(v); const y=window.scrollY; render(); window.scrollTo(0,y); toast("Caravana electrónica leída"); }
+  }
+}
+
+/* ====================== inicio ====================== */
+async function init(){
+  await store.open();
+  S.R = await store.get("R") || {};
+  S.outbox = await store.get("outbox") || {};
+  S.set = Object.assign(S.set, await store.get("set") || {});
+  S.lastSync = await store.get("lastSync") || 0;
+  const qs=new URLSearchParams(location.search);
+  if(qs.get("api")) S.set.api=qs.get("api");
+  if(qs.get("codigo")) S.set.codigo=qs.get("codigo");
+  if(qs.get("estab")) S.set.estab=slug(qs.get("estab"));
+  if(!S.set.api && API_DEFAULT) S.set.api=API_DEFAULT;
+  if(!S.set.estab) S.set.estab=ESTAB_DEFAULT.id;
+  if(qs.get("demo")) demo();
+  S.view = S.set.operario ? "home" : "setup";
+  persist(); render(); sync();
+  if("serviceWorker" in navigator && location.protocol.startsWith("http")){ try{ navigator.serviceWorker.register("sw.js"); }catch(_){} }
+}
+function demo(){
+  if(eventos().length) return;
+  const rnd=a=>a[Math.floor(Math.random()*a.length)], P=["1","2","3","El Bajo"];
+  const add=r=>{ r.clase="evento"; r.id=uid(); r.estab=S.set.estab; r.operario=r.operario||rnd(["Juan","Pedro"]); r.campana=campOf(r); S.R[r.id]=r; };
+  for(let c of [2024,2025]){
+    const n=c===2024?180:190;
+    for(let i=0;i<n;i++){ const x=Math.random(); add({tipo:"tacto",fecha:`${c+1}-02-${pad(10+i%10)}T10:00`,animal:"0320"+String(100000000+c*1000+i).slice(-11),ident:"eid",resultado:x<.07?"vacia":x<.6?"cabeza":x<.85?"cuerpo":"cola",lote:i<40?"Vaquillonas":"Vacas",categoria:i<40?"vaquillona":"vaca"}); }
+    if(c===2024) for(let i=0;i<160;i++){ const dd=new Date(c+1,6,10+Math.floor(Math.pow(Math.random(),1.6)*70)); add({tipo:"parto",fecha:`${dd.getFullYear()}-${pad(dd.getMonth()+1)}-${pad(dd.getDate())}T${pad(6+i%12)}:00`,madre:String(200+i),madreIdent:"visual",animal:"P"+i,ident:"prov",sexo:Math.random()<.5?"M":"H",estado:Math.random()<.035?"muerto":"vivo",dificultad:Math.random()<.08?"3":"1",peso:30+Math.round(Math.random()*12),potrero:rnd(P),categoria:"ternero"}); }
+    if(c===2024) for(let i=0;i<150;i++) add({tipo:"destete",fecha:`2026-03-${pad(5+i%3)}T10:00`,animal:"0320"+String(300000000+i).slice(-11),ident:"eid",sexo:i%2?"M":"H",peso:165+Math.round(Math.random()*50),lote:"Destete 2026"});
+  }
+  const hoy=new Date(); const y=hoy.getFullYear();
+  for(let i=0;i<5;i++) add({tipo:"parto",fecha:nowLocal(),madre:String(400+i),madreIdent:"visual",animal:provisional(),ident:"prov",sexo:i%2?"M":"H",estado:"vivo",dificultad:"1",potrero:"2",categoria:"ternero"});
+  ["v-repro","v-cobre","v-diarrea","q-repro"].forEach((t,i)=>add({tipo:"sanidad",tarea:t,detalle:t,fecha:`${y}-0${5+i%2}-10T10:00`,cantidad:150,animalTipo:"sin"}));
+  const E=estab(); E.campanas[2024]={vacas:140,vaquillonas:40,toros:6}; E.campanas[2025]={vacas:150,vaquillonas:40,toros:7}; S.R[E.id]=E;
+}
+init();
+})();
+</script>
+</body>
+</html>
