@@ -240,6 +240,12 @@ const eventos = () => Object.values(S.R).filter(r=>r.clase!=="config" && !r.borr
 /* ----- lotes (se cargan en Oficina → Lotes; los ve el operario en Campo) ----- */
 const lotesE = (E=estab()) => (E.lotes||[]).filter(l=>!l.borrado);
 const loteById = id => lotesE().find(l=>l.id===id);
+/* filtro global por lote o corral (Indicadores e Índices): lotes cargados + nombres de lote usados en la carga */
+const loteOpts = () => { const L=lotesE(), o=L.map(l=>({k:l.id,n:l.nombre,l})), ns=new Set(L.map(l=>norm(l.nombre))); [...new Set(eventos().map(e=>e.lote).filter(Boolean))].forEach(n=>{ if(!ns.has(norm(n))){ ns.add(norm(n)); o.push({k:"n:"+norm(n),n,l:null}); } }); return o; };
+const loteSelObj = () => S.loteF ? loteOpts().find(o=>o.k===S.loteF)||null : null;
+const enLote = (e,o) => !o || (o.l ? matchLote(e,o.l) : norm(e.lote)===norm(o.n));
+const evF = () => { const o=loteSelObj(); return o ? eventos().filter(e=>enLote(e,o)) : eventos(); };
+function loteBar(){ const O=loteOpts(); if(!O.length) return ""; const o=loteSelObj(); return `<div class="field"><label>Lote / corral</label><div class="chips"><button type="button" class="chip ${o?"":"ok"}" data-set="loteF" data-v="">Total del establecimiento</button>${O.map(x=>`<button type="button" class="chip ${o&&o.k===x.k?"ok":""}" data-set="loteF" data-v="${esc(x.k)}">${esc(x.n)}</button>`).join("")}</div></div>`; }
 const matchLote = (e,l) => (e.loteId && e.loteId===l.id) || (!e.loteId && !!e.lote && norm(e.lote)===norm(l.nombre));
 const catsE = (E=estab()) => (E.cats&&E.cats.length?E.cats:CATS_BASE);
 const sumCats = (l,fn) => catsE().filter(fn).reduce((a,c)=>a+(num((l.comp||{})[c.id])||0),0);
@@ -773,7 +779,7 @@ function renderResumen(){
   const grupos={}; if(g) rs.forEach(e=>{ const k=claveGrupo(e,g); (grupos[k]=grupos[k]||[]).push(e); });
   const keys=ordenar(Object.keys(grupos));
   const pots=[...new Set(eventos().map(e=>e.potrero).filter(Boolean))].sort();
-  const lotes=[...new Set(eventos().map(e=>e.lote).filter(Boolean))].sort();
+  const lotes=[...new Set([...lotesE().map(l=>l.nombre),...eventos().map(e=>e.lote).filter(Boolean)])].sort();
   return `<h1>Resumen</h1>
   <div class="card">
     <div class="field"><label>Preguntá escribiendo</label>
@@ -816,14 +822,14 @@ function csv(rs){
 /* ----- indicadores por campaña ----- */
 function campanias(){ const s=new Set(eventos().map(campOf).filter(Boolean)); Object.keys(estab().campanas||{}).forEach(c=>s.add(Number(c))); const y=new Date().getFullYear(); s.add(new Date().getMonth()>=9?y:y-1); return [...s].sort((a,b)=>b-a); }
 function calcCamp(c){
-  const E=estab(), cfg=E.campanas[c]||{}, ev=eventos().filter(e=>campOf(e)===c);
+  const E=estab(), cfg=E.campanas[c]||{}, ev=evF().filter(e=>campOf(e)===c), lo=loteSelObj();
   const tac=ev.filter(e=>e.tipo==="tacto"), par=ev.filter(e=>e.tipo==="parto"), des=ev.filter(e=>e.tipo==="destete"), mt=ev.filter(e=>e.tipo==="muerte"&&e.categoria==="ternero");
   const pre=tac.filter(e=>e.resultado!=="vacia").length, vac=tac.length-pre, cab=tac.filter(e=>e.resultado==="cabeza").length, cue=tac.filter(e=>e.resultado==="cuerpo").length, col=tac.filter(e=>e.resultado==="cola").length;
-  const vientres=(num(cfg.vacas)||0)+(num(cfg.vaquillonas)||0) || tac.length || null;
+  const vientres=(lo ? (lo.l?vientresLote(lo.l):0) : (num(cfg.vacas)||0)+(num(cfg.vaquillonas)||0)) || tac.length || null;
   const muertosP=par.filter(e=>e.estado==="muerto").length, vivos=par.length-muertosP;
   const pesos=des.map(e=>num(e.peso)).filter(x=>x!=null), kgDest=pesos.reduce((a,b)=>a+b,0);
-  const toros=num(cfg.toros);
-  return {c,cfg,vientres,tac:tac.length,pre,vac,cab,cue,col,partos:par.length,vivos,muertosP,machos:par.filter(e=>e.sexo==="M").length,hembras:par.filter(e=>e.sexo==="H").length,dist:par.filter(e=>Number(e.dificultad)>=3).length,
+  const toros=lo ? (lo.l?sumCats(lo.l,x=>norm(x.nombre).includes("toro"))||null:null) : num(cfg.toros);
+  return {c,cfg,lo,vientres,tac:tac.length,pre,vac,cab,cue,col,partos:par.length,vivos,muertosP,machos:par.filter(e=>e.sexo==="M").length,hembras:par.filter(e=>e.sexo==="H").length,dist:par.filter(e=>Number(e.dificultad)>=3).length,
     mt:mt.length,dest:des.length,pesoDest:pesos.length?kgDest/pesos.length:null,kgDest,
     prenez:pct(pre,tac.length),pcab:pct(cab,pre),paricion:pct(par.length,vientres),mortPeri:pct(muertosP,par.length),mortDest:pct(mt.length,vivos),destete:pct(des.length,vientres),kgVaca:vientres&&pesos.length?kgDest/vientres:null,perdida:pre?pct(pre-par.length,pre):null,torosPct:pct(toros,vientres),par};
 }
@@ -834,6 +840,7 @@ function renderIndicadores(){
   const kp=(l,v,unit,cls,sub)=>`<div class="kpi ${cls}"><span>${l}</span><b>${v}${v!=="—"?unit:""}</b><small>${sub||""}</small></div>`;
   return `<h1>Indicadores</h1>
   <div class="field"><label>Campaña (año del entore)</label>${seg("campSel",cs.map(x=>[x,`${x}/${String(x+1).slice(2)}`]),c)}</div>
+  ${loteBar()}${k.lo?`<div class="banner">Mostrando el lote <b>${esc(k.lo.n)}</b>: vientres y toros salen de las cabezas cargadas en el lote.</div>`:""}
   <div class="card"><h3 style="margin-top:0">Datos de la campaña ${c}/${String(c+1).slice(2)}</h3>
     <div class="row2">${fld("Vacas entoradas",`<input type="number" inputmode="numeric" data-camp="vacas" value="${k.cfg.vacas??""}">`)}${fld("Vaquillonas entoradas",`<input type="number" inputmode="numeric" data-camp="vaquillonas" value="${k.cfg.vaquillonas??""}">`)}</div>
     <div class="row2">${fld("Toros en servicio",`<input type="number" inputmode="numeric" data-camp="toros" value="${k.cfg.toros??""}">`)}${fld("Inicio del entore",`<input type="date" data-camp="inicio" value="${k.cfg.inicio??""}">`)}</div>
@@ -968,8 +975,8 @@ function aplicarImport(){
 
 /* ----- índices de eficiencia ----- */
 function calcIdx(c){
-  const k=calcCamp(c), E=estab(), cfg=k.cfg, all=eventos(), ev=all.filter(e=>campOf(e)===c);
-  const ha=num(E.superficieGan)||num(E.superficie);
+  const k=calcCamp(c), E=estab(), cfg=k.cfg, all=evF(), ev=all.filter(e=>campOf(e)===c);
+  const ha=k.lo ? (k.lo.l?num(k.lo.l.ha):null) : (num(E.superficieGan)||num(E.superficie));
   const fp=k.par.map(e=>e.fecha.slice(0,10)).sort(), ini=cfg.inicio?addD(cfg.inicio,283):(fp[0]||null);
   const enD=d=>ini?k.par.filter(e=>{ const x=(new Date(e.fecha.slice(0,10)+"T12:00")-new Date(ini+"T12:00"))/864e5; return x>=0&&x<d; }).length:0;
   const pm={}; all.filter(e=>e.tipo==="parto"&&e.madre&&e.madreIdent!=="sin").forEach(e=>(pm[e.madre]=pm[e.madre]||[]).push(e));
@@ -978,12 +985,12 @@ function calcIdx(c){
   const adj=[]; ev.filter(e=>e.tipo==="destete"&&e.animal&&nac[e.animal]&&num(e.peso)).forEach(e=>{ const p=nac[e.animal], ed=(new Date(e.fecha)-new Date(p.fecha))/864e5, pn=num(p.peso)||35; if(ed>=90&&ed<=330) adj.push((num(e.peso)-pn)/ed*205+pn); });
   const pv=ev.filter(e=>e.tipo==="pesada"&&e.categoria==="vaca").map(e=>num(e.peso)).filter(x=>x!=null), pesoVaca=pv.length?avg(pv):num(cfg.pesoVaca);
   const hz=ev.filter(e=>e.tipo==="hacienda"), kgM=m=>hz.filter(e=>m.includes(e.mov)).reduce((a,e)=>a+(num(e.kgTot)||0),0), cbM=m=>hz.filter(e=>m.includes(e.mov)).reduce((a,e)=>a+(num(e.cabezas)||0),0);
-  const kgIni=num(cfg.kgIni), kgFin=num(cfg.kgFin);
+  const kgIni=k.lo?null:num(cfg.kgIni), kgFin=k.lo?null:num(cfg.kgFin);
   const prod=kgIni!=null&&kgFin!=null?kgFin+kgM(["venta","refugo","trasSal"])-kgM(["compra","trasEnt"])-kgIni+kgM(["consumo"]):null;
-  const L=lotesE(E), evT=L.reduce((a,l)=>a+evLote(l),0), cabL=L.reduce((a,l)=>a+cabLote(l),0), cabIni=num(cfg.cabIni)||cabL||null;
+  const L=k.lo?(k.lo.l?[k.lo.l]:[]):lotesE(E), evT=L.reduce((a,l)=>a+evLote(l),0), cabL=L.reduce((a,l)=>a+cabLote(l),0), cabIni=(k.lo?null:num(cfg.cabIni))||cabL||null;
   return {...k, ha, ini, hz:hz.length, conc21:pct(enD(21),k.partos), conc42:pct(enD(42),k.partos), iep:avg(iep), iepN:iep.length, adj205:avg(adj), adjN:adj.length, pesoVaca, pvN:pv.length,
     relTV:pesoVaca&&k.pesoDest?pct(k.pesoDest,pesoVaca):null, kgHa:ha&&k.kgDest?k.kgDest/ha:null, evHa:ha&&evT?evT/ha:null, cabHa:ha&&cabL?cabL/ha:null, prod, prodHa:prod!=null&&ha?prod/ha:null,
-    efStock:prod!=null&&ha&&(kgIni+kgFin)?pct(prod,(kgIni+kgFin)/2):null, extr:pct(cbM(["venta","refugo"]),cabIni), refugo:pct(cbM(["refugo"]),k.vientres), repos:pct(num(cfg.vaquillonas),k.vientres), vivosPct:pct(k.vivos,k.vientres)};
+    efStock:prod!=null&&ha&&(kgIni+kgFin)?pct(prod,(kgIni+kgFin)/2):null, extr:pct(cbM(["venta","refugo"]),cabIni), refugo:pct(cbM(["refugo"]),k.vientres), repos:pct(k.lo?(k.lo.l?sumCats(k.lo.l,x=>x.vientre&&norm(x.nombre).includes("vaquill")):null):num(cfg.vaquillonas),k.vientres), vivosPct:pct(k.vivos,k.vientres)};
 }
 function renderIndices(){
   const cs=campanias(); if(!S.campSel||!cs.includes(S.campSel)) S.campSel=cs[0];
@@ -994,13 +1001,14 @@ function renderIndices(){
   const entor=num(cfg.vacas)||num(cfg.vaquillonas);
   return `<h1>Índices de eficiencia</h1>
   <div class="field"><label>Campaña (año del entore)</label>${seg("campSel",cs.map(x=>[x,`${x}/${String(x+1).slice(2)}`]),c)}</div>
-  ${entor?"":`<div class="banner">Faltan los vientres entorados de esta campaña. Cargalos abajo en <b>Datos de la campaña</b>.</div>`}
+  ${loteBar()}${k.lo?`<div class="banner">Mostrando el lote <b>${esc(k.lo.n)}</b>. Vientres, toros, reposición, superficie y carga salen del lote. Producción de carne, eficiencia de stock y extracción se calculan solo para el total.</div>`:""}
+  ${entor||k.lo?"":`<div class="banner">Faltan los vientres entorados de esta campaña. Cargalos abajo en <b>Datos de la campaña</b>.</div>`}
   ${G("Reproductivos",
     R("Preñez",f1(k.prenez),"%","Preñadas ÷ tactadas (tacto en manga)",`≥ ${M.prenez}%`,sem(k.prenez,M.prenez),F(k.tac,"tacto en manga"))+
     R("Preñez cabeza",f1(k.pcab),"%","Cabeza ÷ preñadas",`≥ ${M.cabeza}%`,sem(k.pcab,M.cabeza),F(k.tac,"tacto en manga"))+
     R("Toros en servicio",f1(k.torosPct),"%","Toros ÷ vientres entorados",`${M.torosMin}–${M.torosMax}%`,k.torosPct==null?"":(k.torosPct>=M.torosMin&&k.torosPct<=M.torosMax?"ok":"warn"),F(num(cfg.toros),"toros en servicio"))+
-    R("Parición",f1(k.paricion),"%",`Partos ÷ vientres entorados (${k.vientres??"—"})`,"","",F(entor,"vacas y vaquillonas entoradas")+F(k.partos,"partos a campo"))+
-    R("Terneros nacidos vivos",f1(k.vivosPct),"%","Nacidos vivos ÷ vientres entorados","","",F(entor,"vientres entorados"))+
+    R("Parición",f1(k.paricion),"%",`Partos ÷ vientres entorados (${k.vientres??"—"})`,"","",F(entor||(k.lo&&k.vientres),"vacas y vaquillonas entoradas")+F(k.partos,"partos a campo"))+
+    R("Terneros nacidos vivos",f1(k.vivosPct),"%","Nacidos vivos ÷ vientres entorados","","",F(entor||(k.lo&&k.vientres),"vientres entorados"))+
     R("Pérdida preñez → parto",f1(k.perdida),"%","(Preñadas − partos) ÷ preñadas","≤ 5%",k.perdida==null?"":k.perdida<=5?"ok":"warn","")+
     R("Concentración de parición 21 días",f1(k.conc21),"%",`Partos en los primeros 21 días ÷ partos${k.ini?" (desde "+fmtD(k.ini)+")":""}`,`≥ ${M.cabeza}%`,sem(k.conc21,M.cabeza),F(cfg.inicio,"inicio del entore (se usa el primer parto)"))+
     R("Concentración de parición 42 días",f1(k.conc42),"%","Partos en los primeros 42 días ÷ partos","≥ 85%",sem(k.conc42,85),"")+
@@ -1132,6 +1140,7 @@ document.addEventListener("click", e=>{
   if(d.sub){ S.sub=d.sub; render(); return; }
   if(d.set!==undefined){
     const k=d.set, v=d.v;
+    if(k==="loteF"){ S.loteF=v||null; render(); return; }
     if(k==="campSel"||k==="calYear"){ S[k]=Number(v); render(); return; }
     if(k==="impAccion"){ S.imp.accion=v; render(); return; }
     const f=S.f; if(!f) return;
@@ -1145,8 +1154,8 @@ document.addEventListener("click", e=>{
   if(d.share){
     let rs, t;
     if(d.share==="hoy"){ rs=eventos().filter(x=>(x.fecha||"").startsWith(todayStr())); const pt=rs.filter(x=>x.tipo==="parto"); t=`*${estab().nombre} · ${fmtD(todayStr())}*\nPartos: ${pt.length} (${pt.filter(x=>x.sexo==="M").length} M / ${pt.filter(x=>x.sexo==="H").length} H)${pt.filter(x=>x.estado==="muerto").length?` · muertos: ${pt.filter(x=>x.estado==="muerto").length}`:""}\n`+["muerte","novedad","lote","instal"].map(tp=>{ const x=rs.filter(r=>r.tipo===tp); return x.length?`${TIPOS[tp].pl}: ${x.map(r=>(r.tipo==="lote"?`${r.lote} ${({ingreso:"entrada",egreso:"salida"})[r.movimiento]||"control"}${r.pastura?" · pastura "+r.pastura:""}${r.remanente?" · remanente "+r.remanente:""}${r.aguada?" · aguada "+r.aguada:""}`:r.tipo==="instal"?`${r.resultado}${r.bebida?" · bebida "+r.bebida:""}${r.molino?" · molino "+r.molino:""}${r.alambrado?" · alambrado "+r.alambrado:""}`:(r.categoria||""))+(r.causa?" ("+r.causa+")":"")+(r.potrero?" en "+r.potrero:"")).join("; ")}\n`:""; }).join("")+`_Cargó: ${S.set.operario||"-"}_`; }
-    else if(d.share==="camp"){ const k=calcCamp(S.campSel); t=`*${estab().nombre} · campaña ${k.c}/${String(k.c+1).slice(2)}*\nPreñez: ${f1(k.prenez)}% (cabeza ${f1(k.pcab)}%)\nPartos: ${k.partos} · mortandad perinatal ${f1(k.mortPeri)}%\nDestete: ${f1(k.destete)}% · ${f0(k.pesoDest)} kg prom · ${f0(k.kgVaca)} kg/vaca entorada\n_Rodeo de cría · APSAVET_`; }
-    else if(d.share==="idx"){ const k=calcIdx(S.campSel); t=`*${estab().nombre} · índices campaña ${k.c}/${String(k.c+1).slice(2)}*\n`+[["Preñez",f1(k.prenez),"%"],["Preñez cabeza",f1(k.pcab),"%"],["Parición",f1(k.paricion),"%"],["Concentración 21 d",f1(k.conc21),"%"],["Intervalo entre partos",f0(k.iep)," d"],["Mort. perinatal",f1(k.mortPeri),"%"],["Mort. parto-destete",f1(k.mortDest),"%"],["Destete",f1(k.destete),"%"],["Peso destete",f0(k.pesoDest)," kg"],["Ajustado 205 d",f0(k.adj205)," kg"],["Kg/vaca entorada",f0(k.kgVaca)," kg"],["Kg destetados/ha",f0(k.kgHa)," kg"],["Carga",f1(k.evHa)," EV/ha"],["Producción",f0(k.prodHa)," kg/ha"],["Extracción",f1(k.extr),"%"],["Refugo",f1(k.refugo),"%"],["Reposición",f1(k.repos),"%"]].filter(x=>x[1]!=="—").map(x=>`${x[0]}: ${x[1]}${x[2]}`).join("\n")+"\n_Rodeo de cría · APSAVET_"; }
+    else if(d.share==="camp"){ const k=calcCamp(S.campSel); t=`*${estab().nombre}${k.lo?" · "+k.lo.n:""} · campaña ${k.c}/${String(k.c+1).slice(2)}*\nPreñez: ${f1(k.prenez)}% (cabeza ${f1(k.pcab)}%)\nPartos: ${k.partos} · mortandad perinatal ${f1(k.mortPeri)}%\nDestete: ${f1(k.destete)}% · ${f0(k.pesoDest)} kg prom · ${f0(k.kgVaca)} kg/vaca entorada\n_Rodeo de cría · APSAVET_`; }
+    else if(d.share==="idx"){ const k=calcIdx(S.campSel); t=`*${estab().nombre}${k.lo?" · "+k.lo.n:""} · índices campaña ${k.c}/${String(k.c+1).slice(2)}*\n`+[["Preñez",f1(k.prenez),"%"],["Preñez cabeza",f1(k.pcab),"%"],["Parición",f1(k.paricion),"%"],["Concentración 21 d",f1(k.conc21),"%"],["Intervalo entre partos",f0(k.iep)," d"],["Mort. perinatal",f1(k.mortPeri),"%"],["Mort. parto-destete",f1(k.mortDest),"%"],["Destete",f1(k.destete),"%"],["Peso destete",f0(k.pesoDest)," kg"],["Ajustado 205 d",f0(k.adj205)," kg"],["Kg/vaca entorada",f0(k.kgVaca)," kg"],["Kg destetados/ha",f0(k.kgHa)," kg"],["Carga",f1(k.evHa)," EV/ha"],["Producción",f0(k.prodHa)," kg/ha"],["Extracción",f1(k.extr),"%"],["Refugo",f1(k.refugo),"%"],["Reposición",f1(k.repos),"%"]].filter(x=>x[1]!=="—").map(x=>`${x[0]}: ${x[1]}${x[2]}`).join("\n")+"\n_Rodeo de cría · APSAVET_"; }
     else if(d.share==="lotes"){ const P=S.loteP||{}; t=`*${estab().nombre} · lotes${P.desde?" desde "+fmtD(P.desde):""}${P.hasta?" hasta "+fmtD(P.hasta):""}*\n`+lotesE().map(l=>{ const k=calcLote(l,P.desde,P.hasta); return `- ${l.nombre}: ${k.partos} partos de ${k.vientres} vientres (${f1(k.paricion)}%) · mort. perinatal ${f1(k.mortPeri)}% · muertes adultos ${k.ma}`; }).join("\n")+"\n_Rodeo de cría · APSAVET_"; }
     else { rs=filtrar(S.filt); t=textoResumen(rs, S.why&&S.why.length?S.why.join(", "):"resumen"); }
     copiar(t); return;
