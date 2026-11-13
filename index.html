@@ -124,6 +124,7 @@ svg text{font-family:system-ui,sans-serif}
 // Dirección del servidor (Apps Script /exec). También se puede pasar en el link: ?api=...
 const API_DEFAULT = "https://script.google.com/macros/s/AKfycbwf5wg1hXDu_sKGDq52Z4w3L8AZQvkKbsZ8qCnUTbwFj2zCo1jmhZuMSp9CZZGerYZ8Pw/exec";
 const ESTAB_DEFAULT = {id:"los-ranqueles", nombre:"Los Ranqueles"};
+const ESTAB_NOMBRES = {"los-ranqueles":"Los Ranqueles","agropecuaria-del-grillo":"Agropecuaria del Grillo"};
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MESES_L = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 
@@ -272,7 +273,7 @@ function calcLote(l,desde,hasta){
 function estabRec(id){ id=id||S.set.estab; const r=S.R["estab-"+id]; return r && !r.borrado ? r : null; }
 function estab(){
   let r=estabRec();
-  if(!r){ r={clase:"config", tipo:"estab", id:"estab-"+(S.set.estab||ESTAB_DEFAULT.id), estab:S.set.estab||ESTAB_DEFAULT.id, nombre:S.set.estab===ESTAB_DEFAULT.id||!S.set.estab?ESTAB_DEFAULT.nombre:S.set.estab, plan:JSON.parse(JSON.stringify(PLAN_BASE)), metas:{...METAS_BASE}, campanas:{}, potreros:[], detalle:"" }; }
+  if(!r){ r={clase:"config", tipo:"estab", id:"estab-"+(S.set.estab||ESTAB_DEFAULT.id), estab:S.set.estab||ESTAB_DEFAULT.id, nombre:ESTAB_NOMBRES[S.set.estab||ESTAB_DEFAULT.id]||S.set.estab, plan:JSON.parse(JSON.stringify(PLAN_BASE)), metas:{...METAS_BASE}, campanas:{}, potreros:[], detalle:"" }; }
   if(!r.plan) r.plan=JSON.parse(JSON.stringify(PLAN_BASE));
   if(!r.metas) r.metas={...METAS_BASE};
   if(!r.campanas) r.campanas={};
@@ -317,6 +318,7 @@ async function sync(){
     const r=await fetch(S.set.api+(S.set.api.includes("?")?"&":"?")+"codigo="+encodeURIComponent(S.set.codigo)+"&desde="+desde);
     const j=await r.json();
     if(!j.ok) throw new Error(j.error||"error");
+    if(j.estab && j.estab!==S.set.estab){ S.set.estab=j.estab; S.filt=null; S.why=null; }
     (j.registros||[]).forEach(rec=>{ if(!S.outbox[rec.id]) S.R[rec.id]=rec; });
     S.lastSync=j.ahora; S.syncState="ok"; S.syncErr="";
     persist();
