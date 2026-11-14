@@ -43,7 +43,7 @@ h3{font-size:16px;margin:12px 0 6px}
 .card{background:var(--card);border-radius:var(--r);padding:14px;box-shadow:0 1px 0 var(--line);margin-bottom:12px}
 .field{display:flex;flex-direction:column;gap:6px;margin:0 0 14px}
 .field>label,.lbl{font-size:14px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
-input[type=text],input[type=number],input[type=date],input[type=datetime-local],input[type=search],input[type=url],select,textarea{width:100%;border:2px solid var(--line);border-radius:12px;padding:12px;background:#fff;min-height:52px}
+input[type=text],input[type=number],input[type=date],input[type=datetime-local],input[type=search],input[type=url],input[type=password],select,textarea{width:100%;border:2px solid var(--line);border-radius:12px;padding:12px;background:#fff;min-height:52px}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand2)}
 textarea{min-height:80px;resize:vertical}
 .idin{font-size:24px;font-weight:700;letter-spacing:.04em}
@@ -124,7 +124,7 @@ svg text{font-family:system-ui,sans-serif}
 // Dirección del servidor (Apps Script /exec). También se puede pasar en el link: ?api=...
 const API_DEFAULT = "https://script.google.com/macros/s/AKfycbwf5wg1hXDu_sKGDq52Z4w3L8AZQvkKbsZ8qCnUTbwFj2zCo1jmhZuMSp9CZZGerYZ8Pw/exec";
 const ESTAB_DEFAULT = {id:"los-ranqueles", nombre:"Los Ranqueles"};
-const ESTAB_NOMBRES = {"los-ranqueles":"Los Ranqueles","agropecuaria-del-grillo":"Agropecuaria del Grillo"};
+const ESTAB_NOMBRES = {"los-ranqueles":"Los Ranqueles","apsavet":"Apsavet"};
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MESES_L = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 
@@ -226,10 +226,11 @@ const S = {
   set:{api:"", codigo:"", operario:"", estab:"", potrero:"", lote:""},
   lastSync:0, syncState:"idle", syncErr:"",
   tab:"campo", view:"home", f:null, sub:"resumen",
+  unl:{},          // estab -> {campo,manga,oficina}: clave con la que se desbloqueó en este celular
   serie:[], q:"", filt:null, campSel:null, calYear:new Date().getFullYear(), editId:null, imp:null
 };
 let saveT;
-function persist(){ clearTimeout(saveT); saveT=setTimeout(()=>{ store.set("R",S.R); store.set("outbox",S.outbox); store.set("set",S.set); store.set("lastSync",S.lastSync); },150); }
+function persist(){ clearTimeout(saveT); saveT=setTimeout(()=>{ store.set("R",S.R); store.set("outbox",S.outbox); store.set("set",S.set); store.set("lastSync",S.lastSync); store.set("unl",S.unl); },150); }
 
 function put(rec){
   rec.actualizadoLocal = Date.now();
@@ -286,7 +287,7 @@ function estab(){
   return r;
 }
 function saveEstab(r){ r.detalle = r.nombre; put(r); }
-const listaEstabs = () => { const m={}; Object.values(S.R).filter(r=>r.tipo==="estab"&&!r.borrado).forEach(r=>m[r.estab]=r.nombre); if(!Object.keys(m).length) m[ESTAB_DEFAULT.id]=ESTAB_DEFAULT.nombre; return m; };
+const listaEstabs = () => { const m={}; Object.values(S.R).filter(r=>r.tipo==="estab"&&!r.borrado).forEach(r=>m[r.estab]=r.nombre); if(S.set.estab && !m[S.set.estab]) m[S.set.estab]=estab().nombre; if(!Object.keys(m).length) m[ESTAB_DEFAULT.id]=ESTAB_DEFAULT.nombre; return m; };
 
 /* Campaña = año del entore. Parto de 2027 → campaña 2026 (entore oct–dic 2026). */
 function campOf(r){
@@ -599,8 +600,33 @@ function guardar(){
   S.f=null; S.editId=null; S.view="home"; render();
 }
 
+/* ====================== claves por sección ====================== */
+const SECC = [["campo","Campo"],["manga","Manga"],["oficina","Oficina"]];
+const claves = (E=estab()) => E.claves||{};
+function abierta(tab){
+  const C=claves(), k=(C[tab]||"").trim(); if(!k) return true;
+  const u=S.unl[S.set.estab]||{};
+  if(u[tab]===k) return true;
+  const ko=(C.oficina||"").trim(); return !!ko && u.oficina===ko;   // la clave de Oficina abre todo
+}
+function renderLock(){
+  const n=(SECC.find(x=>x[0]===S.tab)||[])[1]||S.tab;
+  return `<h1>${esc(n)}</h1>
+  <div class="card"><p style="margin-top:0">Esta sección tiene clave. Pedísela al asesor.</p>
+    ${fld("Clave",`<input type="password" id="lk-in" autocapitalize="off" autocomplete="off">`)}
+    <button class="btn solid block" data-unlock="1">Entrar</button></div>`;
+}
+function desbloquear(){
+  const el=$("#lk-in"), v=(el&&el.value||"").trim(), C=claves(), u=S.unl[S.set.estab]=S.unl[S.set.estab]||{};
+  if(v && v===(C[S.tab]||"").trim()){ u[S.tab]=v; }
+  else if(v && v===(C.oficina||"").trim()){ u.oficina=v; }
+  else { toast("Clave incorrecta"); if(el){ el.value=""; el.focus(); } return; }
+  persist(); toast("Listo"); render();
+}
+
 /* ====================== pantallas ====================== */
 function renderHome(){
+  if(!abierta(S.tab)) return renderLock();
   const ev=eventos(), hoy=todayStr();
   const hoyEv=ev.filter(e=>(e.fecha||"").startsWith(hoy));
   const partos=hoyEv.filter(e=>e.tipo==="parto");
@@ -1098,7 +1124,11 @@ function renderAjustes(){
     ${fld("Tu nombre (quién carga)",`<input type="text" id="aj-op" value="${esc(S.set.operario)}">`)}
     ${fld("Dirección del servidor",`<input type="url" id="aj-api" value="${esc(S.set.api)}" placeholder="https://script.google.com/macros/s/…/exec">`)}
     ${fld("Código de acceso",`<input type="text" id="aj-cod" value="${esc(S.set.codigo)}" autocapitalize="off">`)}
-    <button class="btn solid block" data-ajok="1">Guardar ajustes</button></div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(127,127,127,.25)"><h3 style="margin-top:0">Claves de acceso de ${esc(E.nombre)}</h3>
+      <p class="small muted" style="margin-top:0">Vacío = sección libre. La clave de Oficina abre todo y es la única que deja cambiar estas claves.</p>
+      <div class="row2">${SECC.map(([k,l])=>fld(l,`<input type="text" data-clave="${k}" value="${esc(claves(E)[k]||"")}" autocapitalize="off" autocomplete="off">`)).join("")}</div>
+      <button class="btn block" data-lockall="1" style="margin-top:8px">Bloquear este celular</button></div>
+    <button class="btn solid block" data-ajok="1" style="margin-top:12px">Guardar ajustes</button></div>
   <div class="card"><h3 style="margin-top:0">Metas de ${esc(E.nombre)}</h3>
     <div class="row2">${[["prenez","Preñez %"],["cabeza","Preñez cabeza %"],["mortPeri","Mortandad perinatal %"],["mortDest","Mortandad parto-destete %"],["destete","Destete %"],["kgVaca","Kg destetados / vaca"],["torosMin","Toros mín. %"],["torosMax","Toros máx. %"]].map(([k,l])=>fld(l,`<input type="number" inputmode="decimal" data-meta="${k}" value="${M[k]??""}">`)).join("")}</div></div>
   <div class="card"><h3 style="margin-top:0">Instalar en el celular</h3><p class="small" style="margin:0">Android (Chrome): menú ⋮ → "Instalar aplicación" o "Agregar a pantalla principal". iPhone (Safari): Compartir → "Agregar a inicio". Una vez instalada funciona sin señal.</p></div>
@@ -1122,7 +1152,7 @@ function render(){
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===S.tab&&S.view!=="setup"?"page":"false"));
   $("#tabs").hidden = S.view==="setup";
   const app=$("#app");
-  app.innerHTML = (S.copyTxt?`<div class="card"><h3 style="margin-top:0">Copiá este texto</h3><textarea readonly style="min-height:160px">${esc(S.copyTxt)}</textarea><button class="btn block" data-copyx="1" style="margin-top:8px">Cerrar</button></div>`:"") + (S.view==="setup"?renderSetup(): S.view==="form"?renderForm(): renderHome());
+  app.innerHTML = (S.copyTxt?`<div class="card"><h3 style="margin-top:0">Copiá este texto</h3><textarea readonly style="min-height:160px">${esc(S.copyTxt)}</textarea><button class="btn block" data-copyx="1" style="margin-top:8px">Cerrar</button></div>`:"") + (S.view==="setup"?renderSetup(): S.view==="form"?(abierta(S.tab)?renderForm():renderLock()): renderHome());
   renderSavebar(); renderSync();
 }
 
@@ -1169,6 +1199,8 @@ document.addEventListener("click", e=>{
   if(d.impok){ aplicarImport(); return; }
   if(d.copyx){ S.copyTxt=null; render(); return; }
   if(d.ajok){ guardarAjustes(); return; }
+  if(d.unlock){ desbloquear(); return; }
+  if(d.lockall){ delete S.unl[S.set.estab]; persist(); S.tab="campo"; S.view="home"; toast("Celular bloqueado"); render(); return; }
   if(d.catadd){ const n=$("#cat-nuevo").value.trim(); if(!n) return; const E=estab(); E.cats=JSON.parse(JSON.stringify(catsE(E))); if(E.cats.some(c=>norm(c.nombre)===norm(n))){ toast("Esa categoría ya existe"); return; } E.cats.push({id:"c-"+uid(),nombre:n}); saveEstab(E); render(); return; }
   if(d.catdel){ if(!armar(b,"¿Quitar?")) return; const E=estab(); E.cats=JSON.parse(JSON.stringify(catsE(E))).filter(c=>c.id!==d.catdel); saveEstab(E); render(); return; }
   if(d.lnew){ S.loteEd={id:"l-"+uid(),_nuevo:true,comp:{}}; render(); return; }
@@ -1198,6 +1230,9 @@ function preguntar(){
 }
 function guardarAjustes(){
   const v=$("#aj-estab").value;
+  const E=estab(), C={...claves(E)}; let cambio=false;
+  document.querySelectorAll("[data-clave]").forEach(i=>{ const k=i.dataset.clave, nv=i.value.trim(); if((C[k]||"")!==nv){ C[k]=nv; cambio=true; } });
+  if(cambio){ E.claves=C; saveEstab(E); const u=S.unl[S.set.estab]=S.unl[S.set.estab]||{}; if(C.oficina) u.oficina=C.oficina; }
   S.set.operario=$("#aj-op").value.trim(); S.set.api=$("#aj-api").value.trim(); S.set.codigo=$("#aj-cod").value.trim();
   S.set.estab=v;
   S.filt=null; S.why=null; persist(); toast("Ajustes guardados"); render(); sync();
@@ -1225,6 +1260,7 @@ document.addEventListener("keydown", e=>{
   const t=e.target;
   if(e.key==="Enter"){
     if(t.id==="q"){ e.preventDefault(); preguntar(); return; }
+    if(t.id==="lk-in"){ e.preventDefault(); desbloquear(); return; }
     if(t.dataset && (t.dataset.f==="animal"||t.dataset.f==="madre"||t.dataset.f==="ternero"||t.dataset.f==="peso")){
       e.preventDefault(); t.blur();
       if(S.f && ["cc","destete","pesada"].includes(S.f.tipo) && t.dataset.f==="peso"){ guardar(); return; }
@@ -1252,6 +1288,7 @@ async function init(){
   S.outbox = await store.get("outbox") || {};
   S.set = Object.assign(S.set, await store.get("set") || {});
   S.lastSync = await store.get("lastSync") || 0;
+  S.unl = await store.get("unl") || {};
   const qs=new URLSearchParams(location.search);
   if(qs.get("api")) S.set.api=qs.get("api");
   if(qs.get("codigo")) S.set.codigo=qs.get("codigo");
