@@ -197,7 +197,7 @@ const TIPOS = {
   parto:{n:"Parto",pl:"Partos"}, muerte:{n:"Muerte",pl:"Muertes"}, novedad:{n:"Novedad",pl:"Novedades"},
   tacto:{n:"Tacto",pl:"Tactos"}, toro:{n:"Revisación de toro",pl:"Toros revisados"}, cc:{n:"Condición corporal",pl:"Registros de CC"},
   sanidad:{n:"Sanidad / tarea",pl:"Sanidad y tareas"}, destete:{n:"Destete",pl:"Destetes"}, pesada:{n:"Pesada",pl:"Pesadas"},
-  lote:{n:"Recorrida de lote",pl:"Recorridas de lote"}, hacienda:{n:"Entrada/salida de hacienda",pl:"Entradas y salidas de hacienda"}, instal:{n:"Bebidas, molino y alambrados",pl:"Controles de instalaciones"}
+  lote:{n:"Recorrida de lote",pl:"Recorridas de lote"}, entore:{n:"Entore",pl:"Entores"}, hacienda:{n:"Entrada/salida de hacienda",pl:"Entradas y salidas de hacienda"}, instal:{n:"Bebidas, molino y alambrados",pl:"Controles de instalaciones"}
 };
 const CATS_BASE = [{id:"vacasPre",nombre:"Vacas preñadas",vientre:true,ev:1},{id:"vacasVac",nombre:"Vacas vacías",ev:0.85},{id:"vacasCria",nombre:"Vacas con cría",ev:1},{id:"vaqPre",nombre:"Vaquillonas preñadas",vientre:true,ev:0.9},{id:"vaq",nombre:"Vaquillonas",ev:0.7},{id:"terneros",nombre:"Terneros/as",ev:0.4},{id:"toros",nombre:"Toros",ev:1.3}];
 const MOVS = [["venta","Venta"],["refugo","Refugo"],["compra","Compra"],["trasEnt","Entra de otro campo"],["trasSal","Sale a otro campo"],["consumo","Consumo"],["otras","Salida (otras causas)"]];
@@ -349,7 +349,7 @@ function campOf(r){
   if(r.tipo==="tacto") return m<=8 ? y-1 : y;
   if(r.tipo==="destete") return m<=6 ? y-2 : y-1;
   if(r.tipo==="muerte" && r.categoria==="ternero") return m<=6 ? y-2 : y-1;
-  if(r.tipo==="toro") return m>=7 ? y : y-1;
+  if(r.tipo==="toro"||r.tipo==="entore") return m>=7 ? y : y-1;
   return m>=10 ? y : y-1;
 }
 
@@ -478,6 +478,7 @@ function nuevo(tipo, extra={}){
   const f={tipo, fecha:nowLocal(), potrero:S.set.potrero||"", lote:S.set.lote||"", loteId:S.set.loteId||"", madreTipo:"visual", animalTipo:"visual", ...extra};
   if(tipo==="parto"){ f.estado="vivo"; f.dificultad="1"; f.terneroTipo="prov"; }
   if(tipo==="tacto"||tipo==="cc"||tipo==="destete"||tipo==="pesada"){ S.serie=[]; }
+  if(tipo==="entore"){ f.movimiento="inicio"; f.servicio="natural"; }
   if(tipo==="lote"){ f.movimiento="control"; const l=loteById(f.loteId); if(l){ const u=ubicLote(l); if(u.potrero) f.potrero=u.potrero; if(u.parcela) f.parcela=u.parcela; if(u.haParcela!=null) f.haParcela=String(u.haParcela); } }
   if(tipo==="toro"){ f.aptitud=""; f.tricho="pend"; f.campylo="pend"; f.animalTipo="visual"; }
   S.f=f; S.view="form"; S.editId=null; gps(f); render(); window.scrollTo(0,0);
@@ -550,6 +551,25 @@ function formToro(f){
   ${fld("Campylobacteriosis", seg("campylo",[["neg","Negativo"],["pos","Positivo","bad"],["pend","Pendiente"]],f.campylo))}
   ${fld("Observaciones", `<textarea data-f="obs">${esc(f.obs||"")}</textarea>`)}
   ${masDatos(f)}`;
+}
+const SERVICIOS=[["natural","Natural"],["iatf","IATF + repaso"],["ia","IA + repaso"],["iatfSolo","Solo IATF / IA"]];
+function formEntore(f){
+  const mv=f.movimiento||"inicio", l=f.loteId&&loteById(f.loteId), tp=num(f.toros)&&num(f.vientres)?num(f.toros)/num(f.vientres)*100:null;
+  return `<h1>Entore</h1>
+  ${fld("Movimiento", seg("movimiento",[["inicio","Inicio · entran los toros"],["fin","Fin · salen los toros"]],mv))}
+  ${lotesE().length?lotePick(f):fld("Lote / rodeo", inp("lote",f.lote,{ph:"Ej. vacas 2° servicio"}))}
+  ${mv==="inicio"?fld("Servicio", seg("servicio",SERVICIOS,f.servicio||"natural","g2")):""}
+  <div class="row2">${fld("Vientres entorados", inp("vientres",f.vientres,{type:"number",mode:"numeric"}), l?"Se completa con los vientres del lote.":"")}${fld(mv==="inicio"?"Toros que entran":"Toros que salen", inp("toros",f.toros,{type:"number",mode:"numeric"}), tp!=null?`${f1(tp)}% de toros`:"")}</div>
+  ${fld("Caravanas de los toros", inp("torosIds",f.torosIds,{ph:"Opcional, separadas por coma"}))}
+  ${fld("Fecha", inp("fecha",f.fecha,{type:"datetime-local"}))}
+  ${fld("Observaciones", `<textarea data-f="obs">${esc(f.obs||"")}</textarea>`)}`;
+}
+/* datos del entore de una campaña, cargados en Manga → Entore (respetan el lote elegido arriba) */
+function entoreCamp(c){
+  const ev=evF().filter(e=>e.tipo==="entore"&&campOf(e)===c), ini=ev.filter(e=>(e.movimiento||"inicio")==="inicio"), fin=ev.filter(e=>e.movimiento==="fin");
+  const fI=ini.map(e=>e.fecha.slice(0,10)).sort(), fF=fin.map(e=>e.fecha.slice(0,10)).sort();
+  const toros=ini.reduce((a,e)=>a+(num(e.toros)||0),0), vientres=ini.reduce((a,e)=>a+(num(e.vientres)||0),0);
+  return {n:ev.length, inicio:fI[0]||"", fin:fF.length?fF[fF.length-1]:"", toros:toros||null, vientres:vientres||null};
 }
 function formSanidad(f){
   const E=estab(), tareas=E.plan;
@@ -638,9 +658,10 @@ function construir(f){
     r.categoria="ternero";
   } else {
     const a=identOf(f,"animal"); r.animal=a.id; r.ident=a.ident; r.sena=a.sena;
-    ["categoria","causa","resultado","valor","momento","sexo","aptitud","tricho","campylo","tarea","producto","madre","pastura","remanente","aguada","movimiento","parcela","haParcela","bebida","molino","alambrado","mov","destino"].forEach(k=>{ if(f[k]!=null&&f[k]!=="") r[k]=f[k]; });
+    ["categoria","causa","resultado","valor","momento","sexo","aptitud","tricho","campylo","tarea","producto","madre","pastura","remanente","aguada","movimiento","servicio","torosIds","vientres","toros","parcela","haParcela","bebida","molino","alambrado","mov","destino"].forEach(k=>{ if(f[k]!=null&&f[k]!=="") r[k]=f[k]; });
     if(f.peso!=null) r.peso=num(f.peso); if(f.ce!=null) r.ce=num(f.ce); if(f.edad!=null) r.edad=num(f.edad); if(f.cantidad!=null) r.cantidad=num(f.cantidad); if(f.cabezas!=null&&f.cabezas!=="") r.cabezas=num(f.cabezas);
     if(f.tipo==="lote") r.resultado=f.movimiento||"control";
+    if(f.tipo==="entore"){ r.resultado=f.movimiento||"inicio"; if(r.vientres!=null) r.vientres=num(r.vientres); if(r.toros!=null) r.toros=num(r.toros); }
     if(r.haParcela!=null) r.haParcela=num(r.haParcela);
     if(f.tipo==="hacienda"){ r.resultado=f.mov; r.kgTot=num(f.kg)||(num(f.pesoProm)&&num(f.cabezas)?num(f.pesoProm)*num(f.cabezas):null); if(num(f.pesoProm)) r.pesoProm=num(f.pesoProm); }
     if(f.tipo==="instal") r.resultado = (["regular","malo"].includes(f.bebida)||["falla","parado"].includes(f.molino)||["regular","malo"].includes(f.alambrado)) ? "con problemas" : "ok";
@@ -669,6 +690,8 @@ function validar(f){
   if(f.tipo==="lote" && !String(f.lote||"").trim()) return "Elegí el lote";
   if(f.tipo==="lote" && f.movimiento!=="control" && !String(f.potrero||"").trim()) return "Falta el potrero";
   if(f.tipo==="lote" && f.movimiento==="parcela" && !String(f.parcela||"").trim()) return "Falta la parcela";
+  if(f.tipo==="entore" && !String(f.lote||"").trim() && !num(f.vientres)) return "Elegí el lote o poné los vientres";
+  if(f.tipo==="entore" && (f.movimiento||"inicio")==="inicio" && (f.servicio||"natural")==="natural" && !num(f.toros)) return "Faltan los toros que entran";
   if(f.tipo==="hacienda" && !f.mov) return "Elegí el movimiento";
   if(f.tipo==="hacienda" && !num(f.cabezas)) return "Faltan las cabezas";
   if(f.tipo==="instal" && !f.bebida && !f.molino && !f.alambrado && !f.obs) return "Marcá al menos un control";
@@ -699,7 +722,7 @@ function guardar(){
 const SECC = [["campo","Campo"],["manga","Manga"],["oficina","Oficina"]];
 const HOJAS = {
   campo:[["parto","Parto"],["muerte","Muerte"],["novedad","Novedad"],["lote","Recorrida de lote"],["instal","Bebidas y molino"]],
-  manga:[["tacto","Tacto"],["cc","Condición corporal"],["destete","Destete"],["pesada","Pesada"],["toro","Toros"],["sanidad","Sanidad"],["hacienda","Entradas y salidas"]],
+  manga:[["tacto","Tacto"],["cc","Condición corporal"],["destete","Destete"],["pesada","Pesada"],["toro","Toros"],["entore","Entore"],["sanidad","Sanidad"],["hacienda","Entradas y salidas"]],
   oficina:[["resumen","Resumen"],["lotes","Lotes"],["indicadores","Indicadores"],["indices","Índices"],["calendario","Calendario"],["datos","Datos"],["ajustes","Ajustes"]]
 };
 const claves = (E=estab()) => E.claves||{};
@@ -781,6 +804,7 @@ function renderHome(){
       <button class="big" data-new="destete"><b>Destete${lk("manga","destete")}</b><span>Peso y sexo</span></button>
       <button class="big" data-new="pesada"><b>Pesada${lk("manga","pesada")}</b><span>Cualquier categoría</span></button>
       <button class="big" data-new="toro"><b>Toros${lk("manga","toro")}</b><span>CE, aptitud, venéreas</span></button>
+      <button class="big" data-new="entore"><b>Entore${lk("manga","entore")}</b><span>Entrada y salida de toros, IATF</span></button>
       <button class="big" data-new="sanidad"><b>Sanidad${lk("manga","sanidad")}</b><span>Vacuna o tarea del plan</span></button>
       <button class="big" data-new="hacienda"><b>Entradas y salidas${lk("manga","hacienda")}</b><span>Venta, refugo, compra, traslado</span></button>
     </div>`;
@@ -836,6 +860,7 @@ function rowEv(e){
   else if(e.tipo==="sanidad") d=`${e.detalle||""}${e.cantidad?" · "+e.cantidad+" animales":""}`;
   else if(e.tipo==="toro") d=`${fmtEID(e.animal)} · ${e.resultado}`;
   else if(e.tipo==="lote") d=`${e.lote||""} · ${({ingreso:"entrada",egreso:"salida",parcela:"cambio de parcela"})[e.movimiento]||"control"}${e.parcela?" · parcela "+e.parcela+(num(e.haParcela)?" ("+f1(num(e.haParcela))+" ha)":""):""}${e.pastura?" · pastura "+e.pastura:""}${e.remanente?" · rem. "+e.remanente:""}${e.aguada?" · aguada "+e.aguada:""}`;
+  else if(e.tipo==="entore"){ const tp=num(e.toros)&&num(e.vientres)?` (${f1(num(e.toros)/num(e.vientres)*100)}%)`:""; d=`${e.lote||""} · ${e.movimiento==="fin"?"salen los toros":"inicio"}${e.servicio&&e.movimiento!=="fin"?" · "+((SERVICIOS.find(x=>x[0]===e.servicio)||[,e.servicio])[1]):""}${num(e.vientres)?" · "+f0(num(e.vientres))+" vientres":""}${num(e.toros)?" · "+f0(num(e.toros))+" toros"+tp:""}`; }
   else if(e.tipo==="hacienda") d=`${(MOVS.find(m=>m[0]===e.mov)||["",e.mov])[1]} · ${e.cabezas||"?"} cab ${e.categoria||""}${e.kgTot?" · "+f0(e.kgTot)+" kg":""}${e.destino?" · "+e.destino:""}`;
   else if(e.tipo==="instal") d=`${e.resultado||""}${e.bebida?" · bebida "+e.bebida:""}${e.molino?" · molino "+e.molino:""}${e.alambrado?" · alambr. "+e.alambrado:""}`;
   else if(e.tipo==="novedad") d=`${e.categoria||""} ${e.obs?"· "+e.obs.slice(0,50):""}`;
@@ -846,7 +871,7 @@ function rowEv(e){
 
 function renderForm(){
   const f=S.f;
-  const body = f.tipo==="parto"?formParto(f): f.tipo==="muerte"?formMuerte(f): f.tipo==="novedad"?formNovedad(f): f.tipo==="toro"?formToro(f): f.tipo==="sanidad"?formSanidad(f): f.tipo==="lote"?formLote(f): f.tipo==="instal"?formInstal(f): f.tipo==="hacienda"?formHacienda(f): formSerie(f);
+  const body = f.tipo==="parto"?formParto(f): f.tipo==="muerte"?formMuerte(f): f.tipo==="novedad"?formNovedad(f): f.tipo==="toro"?formToro(f): f.tipo==="sanidad"?formSanidad(f): f.tipo==="lote"?formLote(f): f.tipo==="instal"?formInstal(f): f.tipo==="entore"?formEntore(f): f.tipo==="hacienda"?formHacienda(f): formSerie(f);
   return `<button class="back" data-back="1">← Volver</button>${body}${S.editId?`<button class="btn danger block" data-del="${S.editId}" style="margin-top:8px">Borrar este registro</button>`:""}`;
 }
 function renderSavebar(){
@@ -1066,11 +1091,12 @@ function calcCamp(c){
   const E=estab(), cfg=E.campanas[c]||{}, ev=evF().filter(e=>campOf(e)===c), lo=loteSelObj();
   const tac=ev.filter(e=>e.tipo==="tacto"), par=ev.filter(e=>e.tipo==="parto"), des=ev.filter(e=>e.tipo==="destete"), mt=ev.filter(e=>e.tipo==="muerte"&&e.categoria==="ternero");
   const pre=tac.filter(e=>e.resultado!=="vacia").length, vac=tac.length-pre, cab=tac.filter(e=>e.resultado==="cabeza").length, cue=tac.filter(e=>e.resultado==="cuerpo").length, col=tac.filter(e=>e.resultado==="cola").length;
-  const vientres=(lo ? (lo.l?vientresLote(lo.l):0) : (num(cfg.vacas)||0)+(num(cfg.vaquillonas)||0)) || tac.length || null;
+  const vientres=(lo ? (lo.l?vientresLote(lo.l):0) : (num(cfg.vacas)||0)+(num(cfg.vaquillonas)||0)) || entoreCamp(c).vientres || tac.length || null;
   const muertosP=par.filter(e=>e.estado==="muerto").length, vivos=par.length-muertosP;
   const pesos=des.map(e=>num(e.peso)).filter(x=>x!=null), kgDest=pesos.reduce((a,b)=>a+b,0);
-  const toros=lo ? (lo.l?sumCats(lo.l,x=>norm(x.nombre).includes("toro"))||null:null) : num(cfg.toros);
-  return {c,cfg,lo,vientres,tac:tac.length,pre,vac,cab,cue,col,partos:par.length,vivos,muertosP,machos:par.filter(e=>e.sexo==="M").length,hembras:par.filter(e=>e.sexo==="H").length,dist:par.filter(e=>Number(e.dificultad)>=3).length,
+  const ent=entoreCamp(c);
+  const toros=num(cfg.toros) ?? ent.toros ?? (lo ? (lo.l?sumCats(lo.l,x=>norm(x.nombre).includes("toro"))||null:null) : null);
+  return {c,cfg,ent,lo,vientres,tac:tac.length,pre,vac,cab,cue,col,partos:par.length,vivos,muertosP,machos:par.filter(e=>e.sexo==="M").length,hembras:par.filter(e=>e.sexo==="H").length,dist:par.filter(e=>Number(e.dificultad)>=3).length,
     mt:nCab(mt),dest:des.length,pesoDest:pesos.length?kgDest/pesos.length:null,kgDest,
     prenez:pct(pre,tac.length),pcab:pct(cab,pre),paricion:pct(par.length,vientres),mortPeri:pct(muertosP,par.length),mortDest:pct(nCab(mt),vivos),destete:pct(des.length,vientres),kgVaca:vientres&&pesos.length?kgDest/vientres:null,perdida:pre?pct(pre-par.length,pre):null,torosPct:pct(toros,vientres),par};
 }
@@ -1219,7 +1245,7 @@ function aplicarImport(){
 function calcIdx(c){
   const k=calcCamp(c), E=estab(), cfg=k.cfg, all=evF(), ev=all.filter(e=>campOf(e)===c);
   const ha=k.lo ? (k.lo.l?num(k.lo.l.ha):null) : (num(E.superficieGan)||num(E.superficie));
-  const fp=k.par.map(e=>e.fecha.slice(0,10)).sort(), ini=cfg.inicio?addD(cfg.inicio,283):(fp[0]||null);
+  const fp=k.par.map(e=>e.fecha.slice(0,10)).sort(), ini=(cfg.inicio||k.ent.inicio)?addD(cfg.inicio||k.ent.inicio,283):(fp[0]||null);
   const enD=d=>ini?k.par.filter(e=>{ const x=(new Date(e.fecha.slice(0,10)+"T12:00")-new Date(ini+"T12:00"))/864e5; return x>=0&&x<d; }).length:0;
   const pm={}; all.filter(e=>e.tipo==="parto"&&e.madre&&e.madreIdent!=="sin").forEach(e=>(pm[e.madre]=pm[e.madre]||[]).push(e));
   const iep=[]; Object.values(pm).forEach(a=>{ a.sort((x,y)=>x.fecha.localeCompare(y.fecha)); for(let i=1;i<a.length;i++){ if(campOf(a[i])!==c) continue; const d=(new Date(a[i].fecha)-new Date(a[i-1].fecha))/864e5; if(d>=250&&d<=900) iep.push(d); } });
@@ -1248,11 +1274,11 @@ function renderIndices(){
   ${G("Reproductivos",
     R("Preñez",f1(k.prenez),"%","Preñadas ÷ tactadas (tacto en manga)",`≥ ${M.prenez}%`,sem(k.prenez,M.prenez),F(k.tac,"tacto en manga"))+
     R("Preñez cabeza",f1(k.pcab),"%","Cabeza ÷ preñadas",`≥ ${M.cabeza}%`,sem(k.pcab,M.cabeza),F(k.tac,"tacto en manga"))+
-    R("Toros en servicio",f1(k.torosPct),"%","Toros ÷ vientres entorados",`${M.torosMin}–${M.torosMax}%`,k.torosPct==null?"":(k.torosPct>=M.torosMin&&k.torosPct<=M.torosMax?"ok":"warn"),F(num(cfg.toros),"toros en servicio"))+
+    R("Toros en servicio",f1(k.torosPct),"%","Toros ÷ vientres entorados",`${M.torosMin}–${M.torosMax}%`,k.torosPct==null?"":(k.torosPct>=M.torosMin&&k.torosPct<=M.torosMax?"ok":"warn"),F(num(cfg.toros)??k.ent.toros,"toros en servicio (Manga → Entore)"))+
     R("Parición",f1(k.paricion),"%",`Partos ÷ vientres entorados (${k.vientres??"—"})`,"","",F(entor||(k.lo&&k.vientres),"vacas y vaquillonas entoradas")+F(k.partos,"partos a campo"))+
     R("Terneros nacidos vivos",f1(k.vivosPct),"%","Nacidos vivos ÷ vientres entorados","","",F(entor||(k.lo&&k.vientres),"vientres entorados"))+
     R("Pérdida preñez → parto",f1(k.perdida),"%","(Preñadas − partos) ÷ preñadas",`≤ ${M.perdida}%`,k.perdida==null?"":k.perdida<=M.perdida?"ok":"warn","")+
-    R("Concentración de parición 21 días",f1(k.conc21),"%",`Partos en los primeros 21 días ÷ partos${k.ini?" (desde "+fmtD(k.ini)+")":""}`,`≥ ${M.conc21}%`,sem(k.conc21,M.conc21),F(cfg.inicio,"inicio del entore (se usa el primer parto)"))+
+    R("Concentración de parición 21 días",f1(k.conc21),"%",`Partos en los primeros 21 días ÷ partos${k.ini?" (desde "+fmtD(k.ini)+")":""}`,`≥ ${M.conc21}%`,sem(k.conc21,M.conc21),F(cfg.inicio||k.ent.inicio,"inicio del entore (Manga → Entore; si no, se usa el primer parto)"))+
     R("Concentración de parición 42 días",f1(k.conc42),"%","Partos en los primeros 42 días ÷ partos",`≥ ${M.conc42}%`,sem(k.conc42,M.conc42),"")+
     R("Intervalo entre partos",f0(k.iep)," días",`Promedio por vaca identificada (${k.iepN} vacas)`,`≤ ${M.iep} días`,k.iep==null?"":k.iep<=M.iep?"ok":k.iep<=M.iep*1.05?"warn":"bad",F(k.iepN,"partos con la madre identificada en dos campañas"))+
     R("Mortandad perinatal",f1(k.mortPeri),"%","Terneros muertos al parto ÷ partos",`< ${M.mortPeri}%`,sem(k.mortPeri,M.mortPeri,false),"")+
@@ -1443,7 +1469,7 @@ document.addEventListener("click", e=>{
     if(k==="campSel"||k==="calYear"){ S[k]=Number(v); render(); return; }
     if(k==="impAccion"){ S.imp.accion=v; render(); return; }
     const f=S.f; if(!f) return;
-    if(k==="loteSel"){ const l=loteById(v); if(l){ const same=f.loteId===v; f.loteId=same?"":v; f.lote=same?"":l.nombre; if(!same && f.tipo==="sanidad" && !String(f.cantidad||"").trim() && cabLote(l)) f.cantidad=String(cabLote(l)); if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela"){ f.parcela=u.parcela; f.haParcela=u.haParcela!=null?String(u.haParcela):""; } } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+    if(k==="loteSel"){ const l=loteById(v); if(l){ const same=f.loteId===v; f.loteId=same?"":v; f.lote=same?"":l.nombre; if(!same && f.tipo==="sanidad" && !String(f.cantidad||"").trim() && cabLote(l)) f.cantidad=String(cabLote(l)); if(!same && f.tipo==="entore"){ const vv=vientresLote(l)||cabLote(l); if(vv && !String(f.vientres||"").trim()) f.vientres=String(vv); const tt=sumCats(l,x=>norm(x.nombre).includes("toro")); if(tt && !String(f.toros||"").trim()) f.toros=String(tt); } if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela"){ f.parcela=u.parcela; f.haParcela=u.haParcela!=null?String(u.haParcela):""; } } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
     f[k] = (f[k]===v && !["sexo","estado","madreTipo","animalTipo","terneroTipo","categoria","resultado","valor","movimiento","mov"].includes(k)) ? "" : v;
     if(k==="resultado"&&f.tipo==="tacto"&&!S.editId){ guardarTactoCola(); return; }
     const y=window.scrollY; render(); window.scrollTo(0,y);
@@ -1531,7 +1557,7 @@ document.addEventListener("change", e=>{
   if(anotarLote(e.target)) return;
   const t=e.target, d=t.dataset;
   if(t.id==="sel-estab"){ S.set.estab=t.value; S.filt=null; S.why=null; S.loteF=null; persist(); render(); return; }
-  if(d.f && S.f){ S.f[d.f]=t.value; if(d.f==="tarea"||(d.f==="cabezas"&&S.f.tipo==="muerte")){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
+  if(d.f && S.f){ S.f[d.f]=t.value; if(d.f==="tarea"||(d.f==="cabezas"&&S.f.tipo==="muerte")||(S.f.tipo==="entore"&&(d.f==="toros"||d.f==="vientres"))){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
   if(d.filt){ S.filt[d.filt]=t.value; S.why=null; render(); return; }
   if(d.camp){ const E=estab(); E.campanas[S.campSel]=E.campanas[S.campSel]||{}; E.campanas[S.campSel][d.camp]=t.type==="number"?num(t.value):t.value; saveEstab(E); render(); return; }
   if(d.catev){ const E=estab(); E.cats=JSON.parse(JSON.stringify(catsE(E))); const c=E.cats.find(x=>x.id===d.catev); if(c){ c.ev=num(t.value); saveEstab(E); } render(); return; }
@@ -1599,6 +1625,7 @@ async function init(){
       const buscar = ()=>{ if(navigator.onLine){ reg.update().catch(()=>{}); fetch("./",{cache:"no-store"}).catch(()=>{}); } };
       window.addEventListener("online", buscar);
       document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") buscar(); });
+      setInterval(()=>{ if(document.visibilityState==="visible") buscar(); }, 5*60000);   // con la app abierta, busca versión nueva cada 5 minutos
     }catch(_){}
   }
 }
