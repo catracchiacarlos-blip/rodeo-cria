@@ -258,6 +258,7 @@ const S = {
   set:{api:"", codigo:"", operario:"", estab:"", potrero:"", lote:""},
   lastSync:0, syncState:"idle", syncErr:"",
   tab:"campo", view:"home", f:null, sub:"resumen",
+  base:{},         // id -> última versión de cada configuración que vino del servidor
   unl:{},          // estab -> {campo,manga,oficina}: clave con la que se desbloqueó en este celular
   serie:[], q:"", filt:null, campSel:null, calYear:new Date().getFullYear(), editId:null, imp:null
 };
@@ -267,7 +268,7 @@ function editandoAhora(){ const a=document.activeElement; return !!(a && a.close
 function ocupado(){ return S.view==="form" || (!!S.loteEd && S.tab==="oficina" && S.sub==="lotes") || editandoAhora(); }
 function renderSiSePuede(){ if(ocupado()){ S.renderPend=true; renderSync(); } else { S.renderPend=false; render(); } }
 document.addEventListener("focusout", ()=>{ setTimeout(()=>{ if(S.renderPend && !ocupado()){ const y=window.scrollY; S.renderPend=false; render(); window.scrollTo(0,y); } },300); });
-function persist(){ clearTimeout(saveT); saveT=setTimeout(()=>{ store.set("R",S.R); store.set("outbox",S.outbox); store.set("set",S.set); store.set("lastSync",S.lastSync); store.set("unl",S.unl); store.set("loteEd",S.loteEd||null); },150); }
+function persist(){ clearTimeout(saveT); saveT=setTimeout(()=>{ store.set("R",S.R); store.set("outbox",S.outbox); store.set("set",S.set); store.set("lastSync",S.lastSync); store.set("unl",S.unl); store.set("loteEd",S.loteEd||null); store.set("base",S.base); },150); }
 
 function put(rec){
   rec.actualizadoLocal = Date.now();
@@ -324,9 +325,10 @@ function calcLote(l,desde,hasta){
     prenez:pct(pre,tac.length),ritmo:dias?par.length/dias:null,ult7:par.filter(e=>Date.now()-new Date(e.fecha)<=7*864e5).length,pesoNac:pn.length?pn.reduce((a,b)=>a+b,0)/pn.length:null,carga:num(l.ha)?cab/num(l.ha):null};
 }
 function estabRec(id){ id=id||S.set.estab; const r=S.R["estab-"+id]; return r && !r.borrado ? r : null; }
+function estabNuevo(id){ id=id||S.set.estab||ESTAB_DEFAULT.id; return {clase:"config", tipo:"estab", id:"estab-"+id, estab:id, nombre:(S.set.estabNombre&&S.set.rol!=="admin"&&id===S.set.estab?S.set.estabNombre:null)||ESTAB_NOMBRES[id]||campoNombre(S.set.estab)||S.set.estab, plan:JSON.parse(JSON.stringify(PLAN_BASE)), metas:{...METAS_BASE}, campanas:{}, potreros:[], detalle:"" }; }
 function estab(){
   let r=estabRec();
-  if(!r){ r={clase:"config", tipo:"estab", id:"estab-"+(S.set.estab||ESTAB_DEFAULT.id), estab:S.set.estab||ESTAB_DEFAULT.id, nombre:(S.set.estabNombre&&S.set.rol!=="admin"?S.set.estabNombre:null)||ESTAB_NOMBRES[S.set.estab||ESTAB_DEFAULT.id]||campoNombre(S.set.estab)||S.set.estab, plan:JSON.parse(JSON.stringify(PLAN_BASE)), metas:{...METAS_BASE}, campanas:{}, potreros:[], detalle:"" }; }
+  if(!r){ r=estabNuevo(); }
   if(!r.plan) r.plan=JSON.parse(JSON.stringify(PLAN_BASE));
   if(!r.metas) r.metas={...METAS_BASE};
   if(!r.campanas) r.campanas={};
@@ -352,23 +354,36 @@ function campOf(r){
 /* ====================== sincronización ====================== */
 let syncT;
 function syncSoon(){ clearTimeout(syncT); syncT=setTimeout(sync,2500); renderSync(); }
+/* ---- configuración: se combinan los cambios por campo, para que un celular atrasado no borre lo que cargó otro (claves, metas, lotes) ---- */
+const jss = v => JSON.stringify(v===undefined?null:v);
+function baseDe(id, rec){ return S.base[id] || (rec && rec.tipo==="estab" ? estabNuevo(rec.estab) : {}); }
+function mezclarLista(b,l,sv){
+  const bm={}, lm={}; (b||[]).forEach(x=>bm[x.id]=x); (l||[]).forEach(x=>lm[x.id]=x);
+  const out=(sv||[]).map(x=>x).filter(x=>!(bm[x.id] && !lm[x.id])); // lo que este equipo quitó
+  const om={}; out.forEach((x,i)=>om[x.id]=i);
+  (l||[]).forEach(x=>{ if(jss(x)===jss(bm[x.id])) return; if(om[x.id]!=null) out[om[x.id]]=x; else out.push(x); });
+  return out;
+}
+function mezclarCfg(base, local, server){
+  const out={...server};
+  new Set([...Object.keys(local),...Object.keys(base)]).forEach(k=>{
+    if(k==="actualizadoLocal"||k==="actualizado") return;
+    if(jss(local[k])===jss(base[k])) return;            // este equipo no lo cambió: queda lo del servidor
+    if(k==="lotes" && Array.isArray(local[k])){ out[k]=mezclarLista(base[k],local[k],server[k]); return; }
+    if(local[k]===undefined) delete out[k]; else out[k]=local[k];
+  });
+  out.actualizadoLocal=local.actualizadoLocal;
+  return out;
+}
+const necesitaConexion = () => !!(S.set.api && S.set.codigo && S.set.codigoSync!==S.set.codigo);
 async function sync(){
   if(!S.set.api){ S.syncState="local"; renderSync(); return; }
   if(!navigator.onLine){ S.syncState="offline"; renderSync(); return; }
   if(S.syncState==="busy") return;
   S.syncState="busy"; renderSync();
   try{
-    const ids=Object.keys(S.outbox);
-    for(let i=0;i<ids.length;i+=150){
-      const chunk=ids.slice(i,i+150).filter(id=>S.R[id]);
-      const vers={}; chunk.forEach(id=>vers[id]=S.R[id].actualizadoLocal);
-      const ops=chunk.map(id=>S.R[id]);
-      const r=await fetch(S.set.api,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({codigo:S.set.codigo,ops})});
-      const j=await r.json();
-      if(!j.ok) throw new Error(j.error||"error");
-      chunk.forEach(id=>{ if(S.R[id] && S.R[id].actualizadoLocal===vers[id]) delete S.outbox[id]; });
-    }
-    const desde=Math.max(0,S.lastSync-120000);
+    // 1) primero se baja lo del servidor y se combina con lo pendiente; 2) después se sube
+    const desde = S.set.codigoSync===S.set.codigo ? Math.max(0,S.lastSync-120000) : 0;
     const r=await fetch(S.set.api+(S.set.api.includes("?")?"&":"?")+"codigo="+encodeURIComponent(S.set.codigo)+"&desde="+desde);
     const j=await r.json();
     if(!j.ok) throw new Error(j.error||"error");
@@ -380,8 +395,23 @@ async function sync(){
       // este celular es de un solo campo: se borran de acá los datos de otros campos (lo pendiente de subir no se toca)
       Object.keys(S.R).forEach(id=>{ const r=S.R[id]; if(!S.outbox[id] && (r.tipo==="acceso" || (r.estab && r.estab!==j.estab))) delete S.R[id]; });
     }
-    (j.registros||[]).forEach(rec=>{ if(!S.outbox[rec.id]) S.R[rec.id]=rec; });
-    S.lastSync=j.ahora; S.syncState="ok"; S.syncErr=""; S.codMal=false;
+    (j.registros||[]).forEach(rec=>{
+      if(!S.outbox[rec.id]) S.R[rec.id]=rec;
+      else if(rec.clase==="config" && S.R[rec.id]) S.R[rec.id]=mezclarCfg(baseDe(rec.id,rec), S.R[rec.id], rec);
+      if(rec.clase==="config") S.base[rec.id]=JSON.parse(JSON.stringify(rec));
+    });
+    S.lastSync=j.ahora; S.set.codigoSync=S.set.codigo;
+    const ids=Object.keys(S.outbox);
+    for(let i=0;i<ids.length;i+=150){
+      const chunk=ids.slice(i,i+150).filter(id=>S.R[id]);
+      const vers={}; chunk.forEach(id=>vers[id]=S.R[id].actualizadoLocal);
+      const ops=chunk.map(id=>S.R[id]);
+      const rp=await fetch(S.set.api,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({codigo:S.set.codigo,ops})});
+      const jp=await rp.json();
+      if(!jp.ok) throw new Error(jp.error||"error");
+      chunk.forEach(id=>{ const x=S.R[id]; if(x && x.clase==="config") S.base[id]=JSON.parse(JSON.stringify(x)); if(x && x.actualizadoLocal===vers[id]) delete S.outbox[id]; });
+    }
+    S.syncState="ok"; S.syncErr=""; S.codMal=false;
     persist();
     if(!S.f && S.view!=="setup") renderSiSePuede();
   }catch(e){
@@ -711,7 +741,13 @@ function pedirHoja(h, luego){
 const esCompu = () => matchMedia("(pointer: fine)").matches && innerWidth>=900;
 
 /* ====================== pantallas ====================== */
+function renderEsperando(){
+  return `<div class="card" style="text-align:center;padding:28px 18px"><h2 style="margin-top:0">Conectando con el servidor…</h2>
+    <p class="muted">La primera vez con este código la app necesita señal para traer las claves y los datos del campo. Hasta entonces no se puede entrar a las secciones.</p>
+    <button class="btn solid" data-reintentar="1">Reintentar</button></div>`;
+}
 function renderHome(){
+  if(necesitaConexion()) return renderEsperando();
   if(!abierta(S.tab)) return renderLock();
   const ev=eventos(), hoy=todayStr();
   const hoyEv=ev.filter(e=>(e.fecha||"").startsWith(hoy));
@@ -1364,6 +1400,7 @@ document.addEventListener("click", e=>{
   if(d.impok){ aplicarImport(); return; }
   if(d.copyx){ S.copyTxt=null; render(); return; }
   if(d.ajok){ guardarAjustes(); return; }
+  if(d.reintentar){ sync(); toast("Conectando…"); return; }
   if(d.metareset){ if(!confirm("¿Volver a las metas de base en este establecimiento?")) return; const E=estab(); E.metas={...METAS_BASE}; saveEstab(E); S.metasAbiertas=true; const y=window.scrollY; render(); window.scrollTo(0,y); toast("Metas de base"); return; }
   if(d.unlock){ desbloquear(d.unlock); return; }
   if(d.lockall){ S.lockH=null; delete S.unl[S.set.estab]; persist(); S.tab="campo"; S.view="home"; toast("Celular bloqueado"); render(); return; }
@@ -1469,6 +1506,8 @@ async function init(){
   S.set = Object.assign(S.set, await store.get("set") || {});
   S.lastSync = await store.get("lastSync") || 0;
   S.unl = await store.get("unl") || {};
+  S.base = await store.get("base") || {};
+  if(S.set.codigoSync===undefined && S.lastSync && S.set.codigo) S.set.codigoSync=S.set.codigo;   // equipos que ya venían sincronizando
   const borrador = await store.get("loteEd");
   if(borrador && borrador.id){ S.loteEd=borrador; S.tab="oficina"; S.sub="lotes"; setTimeout(()=>toast("Tenés un lote sin guardar: seguí cargándolo"),600); }
   const qs=new URLSearchParams(location.search);
