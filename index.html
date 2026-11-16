@@ -262,7 +262,12 @@ const S = {
   serie:[], q:"", filt:null, campSel:null, calYear:new Date().getFullYear(), editId:null, imp:null
 };
 let saveT;
-function persist(){ clearTimeout(saveT); saveT=setTimeout(()=>{ store.set("R",S.R); store.set("outbox",S.outbox); store.set("set",S.set); store.set("lastSync",S.lastSync); store.set("unl",S.unl); },150); }
+/* no redibujar la pantalla mientras alguien está cargando datos */
+function editandoAhora(){ const a=document.activeElement; return !!(a && a.closest && a.closest("#app") && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id!=="buscar" && !a.readOnly); }
+function ocupado(){ return S.view==="form" || (!!S.loteEd && S.tab==="oficina" && S.sub==="lotes") || editandoAhora(); }
+function renderSiSePuede(){ if(ocupado()){ S.renderPend=true; renderSync(); } else { S.renderPend=false; render(); } }
+document.addEventListener("focusout", ()=>{ setTimeout(()=>{ if(S.renderPend && !ocupado()){ const y=window.scrollY; S.renderPend=false; render(); window.scrollTo(0,y); } },300); });
+function persist(){ clearTimeout(saveT); saveT=setTimeout(()=>{ store.set("R",S.R); store.set("outbox",S.outbox); store.set("set",S.set); store.set("lastSync",S.lastSync); store.set("unl",S.unl); store.set("loteEd",S.loteEd||null); },150); }
 
 function put(rec){
   rec.actualizadoLocal = Date.now();
@@ -369,7 +374,7 @@ async function sync(){
     (j.registros||[]).forEach(rec=>{ if(!S.outbox[rec.id]) S.R[rec.id]=rec; });
     S.lastSync=j.ahora; S.syncState="ok"; S.syncErr=""; S.codMal=false;
     persist();
-    if(!S.f && S.view!=="setup") render();
+    if(!S.f && S.view!=="setup") renderSiSePuede();
   }catch(e){
     S.syncState="err"; S.syncErr=String(e.message||e);
     if(S.syncErr.includes("CODIGO")){ S.syncErr="El código de acceso no es válido"; S.codMal=true; }
@@ -1214,7 +1219,7 @@ function guardarLote(){
   const comp={}; catsE(E).forEach(c=>{ const v=num($("#le-c-"+c.id).value); if(v) comp[c.id]=v; });
   const r={id:l.id,nombre:n,potrero:$("#le-potrero").value.trim(),ha:num($("#le-ha").value),pastura:$("#le-pastura").value.trim(),cargaMax:num($("#le-cargamax").value),aguadas:$("#le-aguadas").value.trim(),ingreso:$("#le-ingreso").value,salida:$("#le-salida").value,comp,obs:$("#le-obs").value.trim()};
   const i=E.lotes.findIndex(x=>x.id===l.id); if(i>=0) E.lotes[i]=r; else E.lotes.push(r);
-  saveEstab(E); S.loteEd=null; toast("Lote guardado"); render();
+  saveEstab(E); S.loteEd=null; persist(); toast("Lote guardado"); render();
 }
 /* ----- ajustes ----- */
 function renderAjustes(){
@@ -1292,7 +1297,7 @@ function render(){
   const app=$("#app");
   app.innerHTML = (S.copyTxt?`<div class="card"><h3 style="margin-top:0">Copiá este texto</h3><textarea readonly style="min-height:160px">${esc(S.copyTxt)}</textarea><button class="btn block" data-copyx="1" style="margin-top:8px">Cerrar</button></div>`:"") + (S.view==="setup"?renderSetup(): S.lockH?renderLock(S.lockH.s,S.lockH.h): S.view==="form"?(abierta(S.tab)?renderForm():renderLock()): renderHome());
   renderSavebar(); renderSync();
-  if(S.versionNueva && S.view!=="form"){ S.versionNueva=false; aplicarVersion(); }
+  if(S.versionNueva && !ocupado()){ S.versionNueva=false; aplicarVersion(); }
 }
 
 /* ====================== eventos ====================== */
@@ -1352,9 +1357,9 @@ document.addEventListener("click", e=>{
   if(d.catdel){ if(!armar(b,"¿Quitar?")) return; const E=estab(); E.cats=JSON.parse(JSON.stringify(catsE(E))).filter(c=>c.id!==d.catdel); saveEstab(E); render(); return; }
   if(d.lnew){ S.loteEd={id:"l-"+uid(),_nuevo:true,comp:{}}; render(); return; }
   if(d.led){ const l=loteById(d.led); if(l){ S.loteEd=JSON.parse(JSON.stringify(l)); render(); window.scrollTo(0,0); } return; }
-  if(d.lcancel){ S.loteEd=null; render(); return; }
+  if(d.lcancel){ if(!armar(b,"Tocá de nuevo: se pierde lo cargado")) return; S.loteEd=null; persist(); render(); return; }
   if(d.lsave){ guardarLote(); return; }
-  if(d.ldel){ if(!armar(b,"Tocá de nuevo para quitar")) return; const E=estab(); E.lotes=(E.lotes||[]).filter(x=>x.id!==S.loteEd.id); saveEstab(E); S.loteEd=null; toast("Lote quitado"); render(); return; }
+  if(d.ldel){ if(!armar(b,"Tocá de nuevo para quitar")) return; const E=estab(); E.lotes=(E.lotes||[]).filter(x=>x.id!==S.loteEd.id); saveEstab(E); S.loteEd=null; persist(); toast("Lote quitado"); render(); return; }
   if(d.nuevoest && (esAdmin()||!S.set.rol)){ const n=$("#aj-nuevo").value.trim(); if(!n) return; const id=slug(n); S.set.estab=id; if(!estabRec(id)) saveEstab({clase:"config",tipo:"estab",id:"estab-"+id,estab:id,nombre:n,plan:JSON.parse(JSON.stringify(PLAN_BASE)),metas:{...METAS_BASE},campanas:{},potreros:[]}); S.filt=null; persist(); toast("Establecimiento agregado: "+n); render(); return; }
   if(d.setup){ S.set.operario=$("#su-op").value.trim(); S.set.codigo=$("#su-cod").value.trim(); const a=$("#su-api"); if(a) S.set.api=a.value.trim(); if(!S.set.operario){ toast("Escribí tu nombre"); return; } if(!S.set.estab) S.set.estab=ESTAB_DEFAULT.id; S.view="home"; persist(); render(); sync(); return; }
 });
@@ -1387,12 +1392,22 @@ function guardarAjustes(){
   S.set.estab=v;
   S.filt=null; S.why=null; persist(); toast("Ajustes guardados"); render(); sync();
 }
+const LE_CAMPOS={"le-nombre":"nombre","le-potrero":"potrero","le-ha":"ha","le-pastura":"pastura","le-cargamax":"cargaMax","le-aguadas":"aguadas","le-ingreso":"ingreso","le-salida":"salida","le-obs":"obs"};
+function anotarLote(t){
+  if(!S.loteEd || !t.id || !t.id.startsWith("le-")) return false;
+  if(t.id.startsWith("le-c-")){ S.loteEd.comp=S.loteEd.comp||{}; S.loteEd.comp[t.id.slice(5)]=t.value; }
+  else if(LE_CAMPOS[t.id]) S.loteEd[LE_CAMPOS[t.id]]=t.value;
+  else return false;
+  persist(); return true;
+}
 document.addEventListener("input", e=>{
+  if(anotarLote(e.target)) return;
   const t=e.target, d=t.dataset;
   if(d.f && S.f){ S.f[d.f]=t.value; if((d.f==="madre"||d.f==="animal"||d.f==="ternero")) marcaBaston(t,d.f); return; }
   if(t.id==="buscar"){ S.buscar=t.value; clearTimeout(S.bt); S.bt=setTimeout(()=>{ const pos=t.selectionStart; render(); const el=$("#buscar"); el.focus(); el.setSelectionRange(pos,pos); },350); return; }
 });
 document.addEventListener("change", e=>{
+  if(anotarLote(e.target)) return;
   const t=e.target, d=t.dataset;
   if(t.id==="sel-estab"){ S.set.estab=t.value; S.filt=null; S.why=null; S.loteF=null; persist(); render(); return; }
   if(d.f && S.f){ S.f[d.f]=t.value; if(d.f==="tarea"){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
@@ -1440,6 +1455,8 @@ async function init(){
   S.set = Object.assign(S.set, await store.get("set") || {});
   S.lastSync = await store.get("lastSync") || 0;
   S.unl = await store.get("unl") || {};
+  const borrador = await store.get("loteEd");
+  if(borrador && borrador.id){ S.loteEd=borrador; S.tab="oficina"; S.sub="lotes"; setTimeout(()=>toast("Tenés un lote sin guardar: seguí cargándolo"),600); }
   const qs=new URLSearchParams(location.search);
   if(qs.get("api")) S.set.api=qs.get("api");
   if(qs.get("codigo")) S.set.codigo=qs.get("codigo");
@@ -1463,7 +1480,7 @@ async function init(){
   }
 }
 function aplicarVersion(){
-  if(S.view==="form"){ S.versionNueva=true; return; }   // no cortar una carga a medias
+  if(ocupado()){ S.versionNueva=true; return; }   // no cortar una carga a medias (formulario, lote o casilla en uso)
   persist(); setTimeout(()=>location.reload(), 1200);
 }
 function demo(){
