@@ -556,7 +556,8 @@ function formSanidad(f){
   return `<h1>Sanidad / tarea del plan</h1>
   ${fld("Tarea del plan", `<select data-f="tarea"><option value="">Elegir…</option>${["Reproductivo","Vacas","Vaquillonas","Terneros","Toros","Desparasitación","Diagnóstico"].map(g=>`<optgroup label="${g}">${tareas.filter(t=>t.grupo===g).map(t=>`<option value="${t.id}" ${f.tarea===t.id?"selected":""}>${esc(t.nombre)}</option>`).join("")}</optgroup>`).join("")}<option value="otra" ${f.tarea==="otra"?"selected":""}>Otra (fuera del plan)</option></select>`)}
   ${fld("Producto / dosis", inp("producto",f.producto,{ph:"Ej. vacuna reproductiva, 5 ml"}))}
-  <div class="row2">${fld("Animales", inp("cantidad",f.cantidad,{type:"number",mode:"numeric"}))}${fld("Lote / rodeo", inp("lote",f.lote,{ph:"Opcional"}))}</div>
+  ${lotesE().length?lotePick(f):""}
+  <div class="row2">${fld("Animales", inp("cantidad",f.cantidad,{type:"number",mode:"numeric"}), f.loteId?"Al elegir el lote se completa con sus cabezas.":"")}${lotesE().length?"":fld("Lote / rodeo", inp("lote",f.lote,{ph:"Opcional"}))}</div>
   ${f.lista&&f.lista.length?`<p class="small">Incluye ${f.lista.length} caravanas electrónicas leídas.</p>`:""}
   ${fld("Fecha", inp("fecha",f.fecha,{type:"datetime-local"}))}
   ${fld("Observaciones", `<textarea data-f="obs">${esc(f.obs||"")}</textarea>`)}`;
@@ -1442,7 +1443,7 @@ document.addEventListener("click", e=>{
     if(k==="campSel"||k==="calYear"){ S[k]=Number(v); render(); return; }
     if(k==="impAccion"){ S.imp.accion=v; render(); return; }
     const f=S.f; if(!f) return;
-    if(k==="loteSel"){ const l=loteById(v); if(l){ const same=f.loteId===v; f.loteId=same?"":v; f.lote=same?"":l.nombre; if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela"){ f.parcela=u.parcela; f.haParcela=u.haParcela!=null?String(u.haParcela):""; } } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+    if(k==="loteSel"){ const l=loteById(v); if(l){ const same=f.loteId===v; f.loteId=same?"":v; f.lote=same?"":l.nombre; if(!same && f.tipo==="sanidad" && !String(f.cantidad||"").trim() && cabLote(l)) f.cantidad=String(cabLote(l)); if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela"){ f.parcela=u.parcela; f.haParcela=u.haParcela!=null?String(u.haParcela):""; } } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
     f[k] = (f[k]===v && !["sexo","estado","madreTipo","animalTipo","terneroTipo","categoria","resultado","valor","movimiento","mov"].includes(k)) ? "" : v;
     if(k==="resultado"&&f.tipo==="tacto"&&!S.editId){ guardarTactoCola(); return; }
     const y=window.scrollY; render(); window.scrollTo(0,y);
