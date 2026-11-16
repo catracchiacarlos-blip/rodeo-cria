@@ -955,6 +955,62 @@ function metricas(rs){
   if(t==="sanidad") cols.push(["an","Animales",r=>f0(r.reduce((a,x)=>a+(num(x.cantidad)||(x.lista?x.lista.length:0)),0))]);
   return cols;
 }
+/* ----- stock: conteo de cada lote + nacimientos y entradas − muertes y salidas cargadas después del conteo ----- */
+const SALIDAS=["venta","refugo","trasSal","consumo","otras"], ENTRADAS=["compra","trasEnt"];
+function stockCalc(E){
+  E=E||estab(); const L=lotesE(E), C=catsE(E);
+  const val=(l,c)=>num((l.comp||{})[c.id])||0;
+  const R={}; C.forEach(c=>R[c.id]={c,conteo:0,nac:0,ent:0,mue:0,sal:0});
+  const Lr={}; L.forEach(l=>Lr[l.id]={l,conteo:C.reduce((a,c)=>a+val(l,c),0),mas:0,menos:0});
+  const SL={l:{nombre:"Sin lote"},conteo:0,mas:0,menos:0};
+  L.forEach(l=>C.forEach(c=>R[c.id].conteo+=val(l,c)));
+  const claveCat={vaca:"vaca",vaquillona:"vaquill",ternero:"terner",toro:"toro"};
+  const otra=n=>{ const id="x-"+norm(n); if(!R[id]) R[id]={c:{id,nombre:n||"Sin categoría"},conteo:0,nac:0,ent:0,mue:0,sal:0,extra:true}; return id; };
+  const catDe=(txt,l,exacta)=>{
+    if(exacta){ const c=C.find(x=>norm(x.nombre)===norm(txt)); if(c) return c.id; }
+    const k=claveCat[norm(txt)]||norm(txt).split(" ")[0]||"";
+    let cs=C.filter(c=>k && norm(c.nombre).includes(k)); if(k==="vaca") cs=cs.filter(c=>!norm(c.nombre).includes("vaquill"));
+    if(!cs.length) return otra(txt);
+    if(l) cs=[...cs].sort((a,b)=>val(l,b)-val(l,a));
+    return cs[0].id;
+  };
+  const tsL=L.map(l=>l.stockTs).filter(Boolean).sort(), tsMin=tsL[0]||null;
+  const sinFecha=L.filter(l=>!l.stockTs).map(l=>l.nombre);
+  eventos().forEach(e=>{
+    const t=e.tipo; let campo=null, n=0, cat=null;
+    const l=L.find(x=>matchLote(e,x));
+    const desde=l?l.stockTs:tsMin; if(!desde || !(e.fecha>desde)) return;   // solo lo cargado después del conteo
+    if(t==="parto" && e.estado!=="muerto"){ campo="nac"; n=1; cat=catDe("ternero",l); }
+    else if(t==="muerte"){ campo="mue"; n=num(e.cabezas)||1; cat=catDe(e.categoria||"",l); }
+    else if(t==="hacienda" && (SALIDAS.includes(e.mov)||ENTRADAS.includes(e.mov))){ campo=SALIDAS.includes(e.mov)?"sal":"ent"; n=num(e.cabezas)||0; cat=catDe(e.categoria||"",l,true); }
+    if(!campo||!n) return;
+    R[cat][campo]+=n;
+    const LL=l?Lr[l.id]:SL; if(campo==="nac"||campo==="ent") LL.mas+=n; else LL.menos+=n;
+  });
+  const filas=Object.values(R).map(r=>({...r,actual:r.conteo+r.nac+r.ent-r.mue-r.sal})).filter(r=>r.conteo||r.nac||r.ent||r.mue||r.sal);
+  const lotes=[...Object.values(Lr),...(SL.mas||SL.menos?[SL]:[])].map(x=>({...x,actual:x.conteo+x.mas-x.menos}));
+  const tot=filas.reduce((a,r)=>a+r.actual,0), vientres=filas.filter(r=>r.c.vientre).reduce((a,r)=>a+r.actual,0), ev=filas.reduce((a,r)=>a+r.actual*(r.extra?1:catEv(r.c)),0);
+  return {filas,lotes,tot,vientres,ev,sinFecha,L};
+}
+function stockCard(){
+  const E=estab(), k=stockCalc(E);
+  if(!k.L.length) return `<div class="card"><h3 style="margin-top:0">Stock</h3><p class="muted" style="margin:0">Todavía no hay lotes. Cargalos en Oficina → Lotes con sus cabezas por categoría.</p></div>`;
+  const ha=num(E.superficieGan)||num(E.superficie), sg=v=>v?`${v>0?"+":"−"}${f0(Math.abs(v))}`:"";
+  return `<div class="card" id="stock"><h3 style="margin-top:0">Stock de ${esc(E.nombre)}</h3>
+    <div class="kpis" style="margin-bottom:10px"><div class="kpi"><span>Cabezas</span><b>${f0(k.tot)}</b></div><div class="kpi"><span>Vientres</span><b>${f0(k.vientres)}</b></div><div class="kpi"><span>EV</span><b>${f1(k.ev)}</b></div>${ha?`<div class="kpi"><span>EV/ha</span><b>${f1(k.ev/ha)}</b></div>`:""}</div>
+    <div class="scroll"><table><thead><tr><th>Categoría</th><th>Conteo</th><th>Nacim.</th><th>Entradas</th><th>Muertes</th><th>Salidas</th><th>Actual</th></tr></thead><tbody>
+      ${k.filas.map(r=>`<tr><td>${esc(r.c.nombre)}${r.c.vientre?` <span class="small muted">(vientre)</span>`:""}</td><td>${f0(r.conteo)}</td><td>${r.nac?"+"+f0(r.nac):""}</td><td>${r.ent?"+"+f0(r.ent):""}</td><td>${r.mue?"−"+f0(r.mue):""}</td><td>${r.sal?"−"+f0(r.sal):""}</td><td><b>${f0(r.actual)}</b></td></tr>`).join("")}
+      <tr><td><b>Total</b></td><td><b>${f0(k.filas.reduce((a,r)=>a+r.conteo,0))}</b></td><td>${sg(k.filas.reduce((a,r)=>a+r.nac,0))}</td><td>${sg(k.filas.reduce((a,r)=>a+r.ent,0))}</td><td>${sg(-k.filas.reduce((a,r)=>a+r.mue,0))}</td><td>${sg(-k.filas.reduce((a,r)=>a+r.sal,0))}</td><td><b>${f0(k.tot)}</b></td></tr>
+    </tbody></table></div>
+    <div class="lbl" style="margin:12px 0 4px">Por lote</div>
+    <div class="scroll"><table><thead><tr><th>Lote</th><th>Conteo</th><th>Fecha conteo</th><th>+</th><th>−</th><th>Actual</th></tr></thead><tbody>
+      ${k.lotes.map(x=>`<tr><td>${esc(x.l.nombre)}</td><td>${f0(x.conteo)}</td><td>${x.l.stockTs?fmtD(x.l.stockTs.slice(0,10)):(x.l.id?`<span class="small muted">sin fecha</span>`:"")}</td><td>${x.mas?"+"+f0(x.mas):""}</td><td>${x.menos?"−"+f0(x.menos):""}</td><td><b>${f0(x.actual)}</b></td></tr>`).join("")}
+    </tbody></table></div>
+    ${k.sinFecha.length?`<div class="banner" style="margin-top:8px">Sin fecha de conteo: ${k.sinFecha.map(esc).join(", ")}. A esos lotes no se les suman ni restan movimientos hasta que tengan la fecha del conteo.
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap"><input type="date" id="stk-fecha" value="${todayStr()}" style="max-width:200px"><button class="btn solid" data-stockfecha="1">Poner esta fecha a esos lotes</button></div></div>`:""}
+    <p class="small muted" style="margin:8px 0 0">Actual = conteo del lote + nacimientos (partos vivos) + entradas − muertes − salidas cargadas después de la fecha del conteo. Al volver a contar, actualizá las cabezas del lote: la fecha del conteo pasa a ser ese día.</p>
+    <button class="btn" data-share="stock" style="margin-top:10px">Copiar para WhatsApp</button></div>`;
+}
 function renderResumen(){
   if(!S.filt){ S.filt={tipos:["parto"], desde:"", hasta:"", grupo:"dia"}; }
   const F=S.filt, rs=filtrar(F), cols=metricas(rs);
@@ -964,6 +1020,7 @@ function renderResumen(){
   const pots=[...new Set(eventos().map(e=>e.potrero).filter(Boolean))].sort();
   const lotes=[...new Set([...lotesE().map(l=>l.nombre),...eventos().map(e=>e.lote).filter(Boolean)])].sort();
   return `<h1>Resumen</h1>
+  ${stockCard()}
   <div class="card">
     <div class="field"><label>Preguntá escribiendo</label>
       <div style="display:flex;gap:8px"><input type="search" id="q" value="${esc(S.q)}" placeholder="Ej: partos de septiembre por potrero" enterkeyhint="search"><button class="btn solid" data-ask="1">Ver</button></div>
@@ -1262,6 +1319,7 @@ function formLoteEd(l){
     ${fld("Aguadas",`<input type="text" id="le-aguadas" value="${esc(l.aguadas||"")}" placeholder="Ej. molino y 2 bebederos">`)}
     <div class="row2">${fld("Fecha de entrada",`<input type="date" id="le-ingreso" value="${l.ingreso||""}">`)}${fld("Salida prevista",`<input type="date" id="le-salida" value="${l.salida||""}">`)}</div>
     <div class="lbl" style="margin:6px 0">Cabezas por categoría</div>
+    ${fld("Fecha del conteo",`<input type="date" id="le-fechastock" value="${esc(l._fechaStock ?? (l.stockTs ? l.stockTs.slice(0,10) : (l._nuevo ? todayStr() : "")))}">`,"Desde esta fecha el stock suma nacimientos y entradas y resta muertes y salidas. Si cambiás las cabezas, pasa a ser hoy.")}
     <div class="row2">${catsE().map(c=>fld(esc(c.nombre),`<input type="number" inputmode="numeric" id="le-c-${c.id}" value="${(l.comp||{})[c.id]??""}">`)).join("")}</div>
     ${fld("Nota para el operario",`<textarea id="le-obs" placeholder="Ej. revisar la aguada del fondo">${esc(l.obs||"")}</textarea>`)}
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn solid" data-lsave="1">Guardar lote</button><button class="btn" data-lcancel="1">Cancelar</button>${l._nuevo?"":`<button class="btn danger" data-ldel="1">Quitar lote</button>`}</div></div>`;
@@ -1272,7 +1330,12 @@ function guardarLote(){
   if(E.lotes.some(x=>x.id!==l.id&&!x.borrado&&norm(x.nombre)===norm(n))){ toast("Ya hay un lote con ese nombre"); return; }
   const comp={}; catsE(E).forEach(c=>{ const v=num($("#le-c-"+c.id).value); if(v) comp[c.id]=v; });
   const r={id:l.id,nombre:n,potrero:$("#le-potrero").value.trim(),parcela:$("#le-parcela").value.trim(),haParcela:num($("#le-haparcela").value),ha:num($("#le-ha").value),pastura:$("#le-pastura").value.trim(),cargaMax:num($("#le-cargamax").value),aguadas:$("#le-aguadas").value.trim(),ingreso:$("#le-ingreso").value,salida:$("#le-salida").value,comp,obs:$("#le-obs").value.trim()};
-  const i=E.lotes.findIndex(x=>x.id===l.id); if(i>=0) E.lotes[i]=r; else E.lotes.push(r);
+  const i=E.lotes.findIndex(x=>x.id===l.id), old=i>=0?E.lotes[i]:null, fIn=($("#le-fechastock").value||"");
+  let ts=old&&old.stockTs||"";
+  if(!old || JSON.stringify(comp)!==JSON.stringify(old.comp||{})) ts = (fIn && fIn!==(old&&old.stockTs||"").slice(0,10) && fIn!==todayStr()) ? fIn+"T00:00" : nowLocal();
+  else if(fIn && fIn!==ts.slice(0,10)) ts = fIn===todayStr() ? nowLocal() : fIn+"T00:00";
+  if(ts) r.stockTs=ts;
+  if(i>=0) E.lotes[i]=r; else E.lotes.push(r);
   saveEstab(E); S.loteEd=null; persist(); toast("Lote guardado"); render();
 }
 /* ----- ajustes ----- */
@@ -1391,6 +1454,7 @@ document.addEventListener("click", e=>{
     if(d.share==="hoy"){ rs=eventos().filter(x=>(x.fecha||"").startsWith(todayStr())); const pt=rs.filter(x=>x.tipo==="parto"); t=`*${estab().nombre} · ${fmtD(todayStr())}*\nPartos: ${pt.length} (${pt.filter(x=>x.sexo==="M").length} M / ${pt.filter(x=>x.sexo==="H").length} H)${pt.filter(x=>x.estado==="muerto").length?` · muertos: ${pt.filter(x=>x.estado==="muerto").length}`:""}\n`+["muerte","novedad","lote","instal"].map(tp=>{ const x=rs.filter(r=>r.tipo===tp); return x.length?`${TIPOS[tp].pl}: ${x.map(r=>(r.tipo==="lote"?`${r.lote} ${({ingreso:"entrada",egreso:"salida"})[r.movimiento]||"control"}${r.pastura?" · pastura "+r.pastura:""}${r.remanente?" · remanente "+r.remanente:""}${r.aguada?" · aguada "+r.aguada:""}`:r.tipo==="instal"?`${r.resultado}${r.bebida?" · bebida "+r.bebida:""}${r.molino?" · molino "+r.molino:""}${r.alambrado?" · alambrado "+r.alambrado:""}`:(r.categoria||""))+(r.causa?" ("+r.causa+")":"")+(r.potrero?" en "+r.potrero:"")).join("; ")}\n`:""; }).join("")+`_Cargó: ${S.set.operario||"-"}_`; }
     else if(d.share==="camp"){ const k=calcCamp(S.campSel); t=`*${estab().nombre}${k.lo?" · "+k.lo.n:""} · campaña ${k.c}/${String(k.c+1).slice(2)}*\nPreñez: ${f1(k.prenez)}% (cabeza ${f1(k.pcab)}%)\nPartos: ${k.partos} · mortandad perinatal ${f1(k.mortPeri)}%\nDestete: ${f1(k.destete)}% · ${f0(k.pesoDest)} kg prom · ${f0(k.kgVaca)} kg/vaca entorada\n_Rodeo de cría · APSAVET_`; }
     else if(d.share==="idx"){ const k=calcIdx(S.campSel); t=`*${estab().nombre}${k.lo?" · "+k.lo.n:""} · índices campaña ${k.c}/${String(k.c+1).slice(2)}*\n`+[["Preñez",f1(k.prenez),"%"],["Preñez cabeza",f1(k.pcab),"%"],["Parición",f1(k.paricion),"%"],["Concentración 21 d",f1(k.conc21),"%"],["Intervalo entre partos",f0(k.iep)," d"],["Mort. perinatal",f1(k.mortPeri),"%"],["Mort. parto-destete",f1(k.mortDest),"%"],["Destete",f1(k.destete),"%"],["Peso destete",f0(k.pesoDest)," kg"],["Ajustado 205 d",f0(k.adj205)," kg"],["Kg/vaca entorada",f0(k.kgVaca)," kg"],["Kg destetados/ha",f0(k.kgHa)," kg"],["Carga",f1(k.evHa)," EV/ha"],["Producción",f0(k.prodHa)," kg/ha"],["Extracción",f1(k.extr),"%"],["Refugo",f1(k.refugo),"%"],["Reposición",f1(k.repos),"%"]].filter(x=>x[1]!=="—").map(x=>`${x[0]}: ${x[1]}${x[2]}`).join("\n")+"\n_Rodeo de cría · APSAVET_"; }
+    else if(d.share==="stock"){ const E=estab(), k=stockCalc(E); t=`*${E.nombre} · stock ${fmtD(todayStr())}*\n`+k.filas.map(r=>`- ${r.c.nombre}: ${f0(r.actual)}`).join("\n")+`\n*Total: ${f0(k.tot)} cabezas*\n\nPor lote:\n`+k.lotes.map(x=>`- ${x.l.nombre}: ${f0(x.actual)}`).join("\n"); }
     else if(d.share==="lotes"){ const P=S.loteP||{}; t=`*${estab().nombre} · lotes${P.desde?" desde "+fmtD(P.desde):""}${P.hasta?" hasta "+fmtD(P.hasta):""}*\n`+lotesE().map(l=>{ const k=calcLote(l,P.desde,P.hasta); return `- ${l.nombre}: ${k.partos} partos de ${k.vientres} vientres (${f1(k.paricion)}%) · mort. perinatal ${f1(k.mortPeri)}% · muertes adultos ${k.ma}`; }).join("\n")+"\n_Rodeo de cría · APSAVET_"; }
     else { rs=filtrar(S.filt); t=textoResumen(rs, S.why&&S.why.length?S.why.join(", "):"resumen"); }
     copiar(t); return;
@@ -1404,6 +1468,7 @@ document.addEventListener("click", e=>{
   if(d.impok){ aplicarImport(); return; }
   if(d.copyx){ S.copyTxt=null; render(); return; }
   if(d.ajok){ guardarAjustes(); return; }
+  if(d.stockfecha){ const f=$("#stk-fecha").value; if(!f){ toast("Elegí la fecha"); return; } const E=estab(); let n=0; (E.lotes||[]).forEach(l=>{ if(!l.borrado&&!l.stockTs){ l.stockTs=f+"T00:00"; n++; } }); saveEstab(E); toast(`Fecha de conteo puesta a ${n} lote${n===1?"":"s"}`); const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(d.reintentar){ sync(); toast("Conectando…"); return; }
   if(d.metareset){ if(!confirm("¿Volver a las metas de base en este establecimiento?")) return; const E=estab(); E.metas={...METAS_BASE}; saveEstab(E); S.metasAbiertas=true; const y=window.scrollY; render(); window.scrollTo(0,y); toast("Metas de base"); return; }
   if(d.unlock){ desbloquear(d.unlock); return; }
@@ -1447,7 +1512,7 @@ function guardarAjustes(){
   S.set.estab=v;
   S.filt=null; S.why=null; persist(); toast("Ajustes guardados"); render(); sync();
 }
-const LE_CAMPOS={"le-nombre":"nombre","le-potrero":"potrero","le-parcela":"parcela","le-ha":"ha","le-haparcela":"haParcela","le-pastura":"pastura","le-cargamax":"cargaMax","le-aguadas":"aguadas","le-ingreso":"ingreso","le-salida":"salida","le-obs":"obs"};
+const LE_CAMPOS={"le-nombre":"nombre","le-potrero":"potrero","le-parcela":"parcela","le-ha":"ha","le-haparcela":"haParcela","le-pastura":"pastura","le-cargamax":"cargaMax","le-aguadas":"aguadas","le-ingreso":"ingreso","le-salida":"salida","le-obs":"obs","le-fechastock":"_fechaStock"};
 function anotarLote(t){
   if(!S.loteEd || !t.id || !t.id.startsWith("le-")) return false;
   if(t.id.startsWith("le-c-")){ S.loteEd.comp=S.loteEd.comp||{}; S.loteEd.comp[t.id.slice(5)]=t.value; }
