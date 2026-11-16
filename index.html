@@ -1469,7 +1469,10 @@ document.addEventListener("click", e=>{
     if(k==="campSel"||k==="calYear"){ S[k]=Number(v); render(); return; }
     if(k==="impAccion"){ S.imp.accion=v; render(); return; }
     const f=S.f; if(!f) return;
-    if(k==="loteSel"){ const l=loteById(v); if(l){ const same=f.loteId===v; f.loteId=same?"":v; f.lote=same?"":l.nombre; if(!same && f.tipo==="sanidad" && !String(f.cantidad||"").trim() && cabLote(l)) f.cantidad=String(cabLote(l)); if(!same && f.tipo==="entore"){ const vv=vientresLote(l)||cabLote(l); if(vv && !String(f.vientres||"").trim()) f.vientres=String(vv); const tt=sumCats(l,x=>norm(x.nombre).includes("toro")); if(tt && !String(f.toros||"").trim()) f.toros=String(tt); } if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela"){ f.parcela=u.parcela; f.haParcela=u.haParcela!=null?String(u.haParcela):""; } } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+    if(k==="loteSel"){ const l=loteById(v); if(l){ const same=f.loteId===v; f.loteId=same?"":v; f.lote=same?"":l.nombre; /* al cambiar de lote se actualiza el número que puso la app; si alguien lo escribió a mano, se respeta */
+const auto=(campo,v)=>{ f._auto=f._auto||{}; const cur=String(f[campo]??"").trim(); if(cur==="" || cur===f._auto[campo]){ f[campo]=v?String(v):""; f._auto[campo]=f[campo]; } };
+if(f.tipo==="sanidad") auto("cantidad", same?"":cabLote(l));
+if(f.tipo==="entore"){ auto("vientres", same?"":(vientresLote(l)||cabLote(l))); auto("toros", same?"":sumCats(l,x=>norm(x.nombre).includes("toro"))); } if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela"){ f.parcela=u.parcela; f.haParcela=u.haParcela!=null?String(u.haParcela):""; } } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
     f[k] = (f[k]===v && !["sexo","estado","madreTipo","animalTipo","terneroTipo","categoria","resultado","valor","movimiento","mov"].includes(k)) ? "" : v;
     if(k==="resultado"&&f.tipo==="tacto"&&!S.editId){ guardarTactoCola(); return; }
     const y=window.scrollY; render(); window.scrollTo(0,y);
