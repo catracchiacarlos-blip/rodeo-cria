@@ -106,6 +106,7 @@ th{font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.03e
 .banner{background:var(--warnbg);color:#5C4300;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:15px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom));background:var(--brand);color:#fff;padding:12px 18px;border-radius:12px;z-index:50;font-weight:600;max-width:90vw;text-align:center}
 .serie{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto}
+.kblock{border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0}.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0 10px}.kgrid .field>label{text-transform:none;letter-spacing:0}
 .subtabs{display:flex;gap:6px;overflow-x:auto;margin:-2px 0 12px;padding-bottom:4px}
 .subtabs button{border:2px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-weight:600;white-space:nowrap}
 .subtabs button[aria-current=page]{background:var(--brand);border-color:var(--brand);color:#fff}
@@ -403,6 +404,7 @@ function gps(f){
 
 /* ====================== formularios ====================== */
 function nuevo(tipo, extra={}){
+  if(!pedirHoja(tipo, ()=>nuevo(tipo, extra))) return;
   const f={tipo, fecha:nowLocal(), potrero:S.set.potrero||"", lote:S.set.lote||"", loteId:S.set.loteId||"", madreTipo:"visual", animalTipo:"visual", ...extra};
   if(tipo==="parto"){ f.estado="vivo"; f.dificultad="1"; f.terneroTipo="prov"; }
   if(tipo==="tacto"||tipo==="cc"||tipo==="destete"||tipo==="pesada"){ S.serie=[]; }
@@ -412,6 +414,7 @@ function nuevo(tipo, extra={}){
 }
 function editar(id){
   const r=S.R[id]; if(!r) return;
+  if(!pedirHoja(r.tipo, ()=>editar(id))) return;
   const f={...r};
   if(r.tipo==="parto"){ f.madreTipo=r.madreIdent||"visual"; f.madre=r.madre; f.terneroTipo=r.ident==="prov"?"prov":"cav"; f.ternero=r.ident==="prov"?"":r.animal; }
   else { f.animalTipo=r.ident||"visual"; }
@@ -617,27 +620,53 @@ function guardar(){
 
 /* ====================== claves por sección ====================== */
 const SECC = [["campo","Campo"],["manga","Manga"],["oficina","Oficina"]];
+const HOJAS = {
+  campo:[["parto","Parto"],["muerte","Muerte"],["novedad","Novedad"],["lote","Recorrida de lote"],["instal","Bebidas y molino"]],
+  manga:[["tacto","Tacto"],["cc","Condición corporal"],["destete","Destete"],["pesada","Pesada"],["toro","Toros"],["sanidad","Sanidad"],["hacienda","Entradas y salidas"]],
+  oficina:[["resumen","Resumen"],["lotes","Lotes"],["indicadores","Indicadores"],["indices","Índices"],["calendario","Calendario"],["datos","Datos"],["ajustes","Ajustes"]]
+};
 const claves = (E=estab()) => E.claves||{};
-function abierta(tab){
-  const C=claves(), k=(C[tab]||"").trim(); if(!k) return true;
-  const u=S.unl[S.set.estab]||{};
-  if(u[tab]===k) return true;
-  const ko=(C.oficina||"").trim(); return !!ko && u.oficina===ko;   // la clave de Oficina abre todo
-}
-function renderLock(){
-  const n=(SECC.find(x=>x[0]===S.tab)||[])[1]||S.tab;
-  return `<h1>${esc(n)}</h1>
-  <div class="card"><p style="margin-top:0">Esta sección tiene clave. Pedísela al asesor.</p>
+const seccDeHoja = h => Object.keys(HOJAS).find(s=>HOJAS[s].some(x=>x[0]===h));
+const nomHoja = (s,h) => ((HOJAS[s]||[]).find(x=>x[0]===h)||[])[1]||h;
+const nomSecc = s => (SECC.find(x=>x[0]===s)||[])[1]||s;
+const claveHoja = (s,h,C=claves()) => String((C.hojas||{})[s+"."+h]||"").trim();
+const unlE = () => S.unl[S.set.estab]||{};
+function maestra(){ const ko=String(claves().oficina||"").trim(); return !!ko && unlE().oficina===ko; }
+function seccLibre(tab){ const k=String(claves()[tab]||"").trim(); if(!k) return true; return unlE()[tab]===k || maestra(); }
+function hojaAbierta(s,h){ const k=claveHoja(s,h); if(!k) return seccLibre(s); return maestra() || unlE()["h:"+s+"."+h]===k; }
+// a la sección se entra con su clave, con la maestra o con la clave de alguna de sus hojas
+function abierta(tab){ return seccLibre(tab) || (HOJAS[tab]||[]).some(([h])=>claveHoja(tab,h) && hojaAbierta(tab,h)); }
+const lk = (s,h) => hojaAbierta(s,h) ? "" : ` <span aria-label="con clave">🔒</span>`;
+function renderLock(s=S.tab, h=null){
+  const titulo = h ? nomHoja(s,h) : nomSecc(s);
+  const msg = h ? "Esta hoja tiene clave. Pedísela al asesor." : "Esta sección tiene clave. Pedísela al asesor.";
+  return `<h1>${esc(titulo)}</h1>
+  <div class="card"><p style="margin-top:0">${msg}</p>
     ${fld("Clave",`<input type="password" id="lk-in" autocapitalize="off" autocomplete="off">`)}
-    <button class="btn solid block" data-unlock="1">Entrar</button></div>`;
+    <button class="btn solid block" data-unlock="${esc(s+(h?"."+h:""))}">Entrar</button>
+    ${h&&s!=="oficina"?`<button class="btn block" data-lkback="1" style="margin-top:8px">Volver</button>`:""}</div>`;
 }
-function desbloquear(){
+function desbloquear(cod){
+  const [s,h]=String(cod||S.tab).split(".");
   const el=$("#lk-in"), v=(el&&el.value||"").trim(), C=claves(), u=S.unl[S.set.estab]=S.unl[S.set.estab]||{};
-  if(v && v===(C[S.tab]||"").trim()){ u[S.tab]=v; }
-  else if(v && v===(C.oficina||"").trim()){ u.oficina=v; }
+  if(!v){ toast("Escribí la clave"); return; }
+  if(h && v===claveHoja(s,h,C)) u["h:"+s+"."+h]=v;
+  else if(v===String(C[s]||"").trim()) u[s]=v;
+  else if(!h && (HOJAS[s]||[]).some(([x])=>claveHoja(s,x,C)===v)) (HOJAS[s]||[]).forEach(([x])=>{ if(claveHoja(s,x,C)===v) u["h:"+s+"."+x]=v; });
+  else if(v===String(C.oficina||"").trim()) u.oficina=v;
   else { toast("Clave incorrecta"); if(el){ el.value=""; el.focus(); } return; }
-  persist(); toast("Listo"); render();
+  persist(); toast("Listo");
+  if(h && !hojaAbierta(s,h)){ toast("Esa clave no abre esta hoja"); render(); return; }
+  const sig=S.lockH&&S.lockH.luego; S.lockH=null;
+  if(sig){ sig(); return; }
+  render();
 }
+// pide la clave de la hoja antes de abrirla; si está abierta sigue de largo
+function pedirHoja(h, luego){
+  const s=seccDeHoja(h); if(!s || hojaAbierta(s,h)) return true;
+  S.lockH={s,h,luego}; render(); window.scrollTo(0,0); return false;
+}
+const esCompu = () => matchMedia("(pointer: fine)").matches && innerWidth>=900;
 
 /* ====================== pantallas ====================== */
 function renderHome(){
@@ -648,11 +677,11 @@ function renderHome(){
   if(S.tab==="campo") return `${banners()}
     <h1>Campo</h1>
     <div class="grid">
-      <button class="big dark wide" data-new="parto"><b>Parto</b><span>Madre, sexo, vivo o muerto, potrero</span></button>
-      <button class="big" data-new="muerte"><b>Muerte</b><span>Vaca, ternero o toro</span></button>
-      <button class="big" data-new="novedad"><b>Novedad</b><span>Aguada, alambrado, enfermo…</span></button>
-      <button class="big" data-new="lote"><b>Recorrida de lote</b><span>Pastura, aguadas, entrada y salida</span></button>
-      <button class="big" data-new="instal"><b>Bebidas y molino</b><span>Bebidas, molino y alambrados</span></button>
+      <button class="big dark wide" data-new="parto"><b>Parto${lk("campo","parto")}</b><span>Madre, sexo, vivo o muerto, potrero</span></button>
+      <button class="big" data-new="muerte"><b>Muerte${lk("campo","muerte")}</b><span>Vaca, ternero o toro</span></button>
+      <button class="big" data-new="novedad"><b>Novedad${lk("campo","novedad")}</b><span>Aguada, alambrado, enfermo…</span></button>
+      <button class="big" data-new="lote"><b>Recorrida de lote${lk("campo","lote")}</b><span>Pastura, aguadas, entrada y salida</span></button>
+      <button class="big" data-new="instal"><b>Bebidas y molino${lk("campo","instal")}</b><span>Bebidas, molino y alambrados</span></button>
     </div>
     ${lotesCampo()}
     <h2>Hoy</h2>
@@ -664,13 +693,13 @@ function renderHome(){
     <h1>Manga</h1>
     <p class="muted small">Carga en serie: identificás el animal, marcás el resultado y pasa solo al siguiente. Funciona con bastón lector.</p>
     <div class="grid">
-      <button class="big dark" data-new="tacto"><b>Tacto</b><span>Cabeza, cuerpo, cola, vacía</span></button>
-      <button class="big" data-new="cc"><b>Condición corporal</b><span>1 a 5 por animal</span></button>
-      <button class="big" data-new="destete"><b>Destete</b><span>Peso y sexo</span></button>
-      <button class="big" data-new="pesada"><b>Pesada</b><span>Cualquier categoría</span></button>
-      <button class="big" data-new="toro"><b>Toros</b><span>CE, aptitud, venéreas</span></button>
-      <button class="big" data-new="sanidad"><b>Sanidad</b><span>Vacuna o tarea del plan</span></button>
-      <button class="big" data-new="hacienda"><b>Entradas y salidas</b><span>Venta, refugo, compra, traslado</span></button>
+      <button class="big dark" data-new="tacto"><b>Tacto${lk("manga","tacto")}</b><span>Cabeza, cuerpo, cola, vacía</span></button>
+      <button class="big" data-new="cc"><b>Condición corporal${lk("manga","cc")}</b><span>1 a 5 por animal</span></button>
+      <button class="big" data-new="destete"><b>Destete${lk("manga","destete")}</b><span>Peso y sexo</span></button>
+      <button class="big" data-new="pesada"><b>Pesada${lk("manga","pesada")}</b><span>Cualquier categoría</span></button>
+      <button class="big" data-new="toro"><b>Toros${lk("manga","toro")}</b><span>CE, aptitud, venéreas</span></button>
+      <button class="big" data-new="sanidad"><b>Sanidad${lk("manga","sanidad")}</b><span>Vacuna o tarea del plan</span></button>
+      <button class="big" data-new="hacienda"><b>Entradas y salidas${lk("manga","hacienda")}</b><span>Venta, refugo, compra, traslado</span></button>
     </div>`;
   return renderOficina();
 }
@@ -702,7 +731,7 @@ function textoInstalar(){
   return `<b>Instalá la app en el celular:</b> en Chrome tocá el menú ⋮ → <b>"Instalar aplicación"</b> o <b>"Agregar a pantalla principal"</b>.`;
 }
 function bannerInstalar(){
-  if(instalada() || INST.oculto) return "";
+  if(instalada() || INST.oculto || (esCompu() && !INST.evento)) return "";
   return `<div class="card" style="border:2px solid var(--acc)"><p style="margin:0 0 10px">${textoInstalar()}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${INST.evento?`<button class="btn solid" data-instalar="1">Instalar</button>`:""}<button class="btn" data-instno="1">Ahora no</button></div></div>`;
 }
@@ -744,8 +773,10 @@ function renderSavebar(){
 
 /* ====================== oficina ====================== */
 function renderOficina(){
-  const tabs=[["resumen","Resumen"],["lotes","Lotes"],["indicadores","Indicadores"],["indices","Índices"],["calendario","Calendario"],["datos","Datos"],["ajustes","Ajustes"]];
-  const head=`${banners()}<div class="subtabs">${tabs.map(([k,l])=>`<button data-sub="${k}" aria-current="${S.sub===k?"page":"false"}">${l}</button>`).join("")}</div>`;
+  const tabs=HOJAS.oficina;
+  if(!hojaAbierta("oficina",S.sub)){ const ab=tabs.find(([k])=>hojaAbierta("oficina",k)); if(ab && !S.subPedida) S.sub=ab[0]; }
+  const head=`${banners()}<div class="subtabs">${tabs.map(([k,l])=>`<button data-sub="${k}" aria-current="${S.sub===k?"page":"false"}">${l}${hojaAbierta("oficina",k)?"":" 🔒"}</button>`).join("")}</div>`;
+  if(!hojaAbierta("oficina",S.sub)) return head+renderLock("oficina",S.sub);
   const b = S.sub==="lotes"?renderLotes(): S.sub==="indices"?renderIndices(): S.sub==="indicadores"?renderIndicadores(): S.sub==="calendario"?renderCalendario(): S.sub==="datos"?renderDatos(): S.sub==="ajustes"?renderAjustes(): renderResumen();
   return head+b;
 }
@@ -1166,14 +1197,21 @@ function renderAjustes(){
     ${fld("Dirección del servidor",`<input type="url" id="aj-api" value="${esc(S.set.api)}" placeholder="https://script.google.com/macros/s/…/exec">`)}
     ${fld("Código de acceso",`<input type="text" id="aj-cod" value="${esc(S.set.codigo)}" autocapitalize="off">`)}
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(127,127,127,.25)"><h3 style="margin-top:0">Claves de acceso de ${esc(E.nombre)}</h3>
-      <p class="small muted" style="margin-top:0">Vacío = sección libre. La clave de Oficina abre todo y es la única que deja cambiar estas claves.</p>
-      <div class="row2">${SECC.map(([k,l])=>fld(l,`<input type="text" data-clave="${k}" value="${esc(claves(E)[k]||"")}" autocapitalize="off" autocomplete="off">`)).join("")}</div>
+      ${editorClaves(E)}
       <button class="btn block" data-lockall="1" style="margin-top:8px">Bloquear este celular</button></div>
     <button class="btn solid block" data-ajok="1" style="margin-top:12px">Guardar ajustes</button></div>
   <div class="card"><h3 style="margin-top:0">Metas de ${esc(E.nombre)}</h3>
     <div class="row2">${[["prenez","Preñez %"],["cabeza","Preñez cabeza %"],["mortPeri","Mortandad perinatal %"],["mortDest","Mortandad parto-destete %"],["destete","Destete %"],["kgVaca","Kg destetados / vaca"],["torosMin","Toros mín. %"],["torosMax","Toros máx. %"]].map(([k,l])=>fld(l,`<input type="number" inputmode="decimal" data-meta="${k}" value="${M[k]??""}">`)).join("")}</div></div>
   <div class="card"><h3 style="margin-top:0">Instalar en el celular</h3><p class="small" style="margin:0 0 8px">${textoInstalar()}</p>${INST.evento&&!instalada()?`<button class="btn solid block" data-instalar="1">Instalar</button>`:""}</div>
   <p class="small muted">Registros en este celular: ${eventos().length} · sin subir: ${Object.keys(S.outbox).length}${S.lastSync?` · última sincronización: ${new Date(S.lastSync).toLocaleString("es-AR")}`:""}</p>`;
+}
+function editorClaves(E){
+  const C=claves(E), ko=String(C.oficina||"").trim();
+  if(!esCompu()) return `<p class="small" style="margin-top:0">Las claves se cargan y se cambian <b>desde la computadora</b>: abrí el mismo link en la compu → Oficina → Ajustes.</p>`;
+  if(ko && !maestra()) return `<p class="small" style="margin-top:0">Para ver y cambiar las claves entrá con la clave de Oficina.</p>`;
+  return `<p class="small muted" style="margin-top:0">Clave de la sección: vacía = sección libre. Clave de una hoja: vacía = usa la de su sección; con clave, solo entra quien la tenga. La clave de Oficina abre todo y es la única que deja cambiar las claves: cargala primero.</p>
+    ${SECC.map(([s,l])=>`<div class="kblock"><div class="kh">${fld(`Sección ${l}`,`<input type="text" data-clave="${s}" value="${esc(C[s]||"")}" autocapitalize="off" autocomplete="off" placeholder="Libre">`)}</div>
+      <div class="kgrid">${HOJAS[s].map(([h,n])=>fld(n,`<input type="text" data-hclave="${s}.${h}" value="${esc((C.hojas||{})[s+"."+h]||"")}" autocapitalize="off" autocomplete="off" placeholder="Usa la de ${esc(l)}">`)).join("")}</div></div>`).join("")}`;
 }
 function renderSetup(){
   return `<h1>Bienvenido</h1><p class="muted">Se configura una sola vez en este celular.</p>
@@ -1193,7 +1231,7 @@ function render(){
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===S.tab&&S.view!=="setup"?"page":"false"));
   $("#tabs").hidden = S.view==="setup";
   const app=$("#app");
-  app.innerHTML = (S.copyTxt?`<div class="card"><h3 style="margin-top:0">Copiá este texto</h3><textarea readonly style="min-height:160px">${esc(S.copyTxt)}</textarea><button class="btn block" data-copyx="1" style="margin-top:8px">Cerrar</button></div>`:"") + (S.view==="setup"?renderSetup(): S.view==="form"?(abierta(S.tab)?renderForm():renderLock()): renderHome());
+  app.innerHTML = (S.copyTxt?`<div class="card"><h3 style="margin-top:0">Copiá este texto</h3><textarea readonly style="min-height:160px">${esc(S.copyTxt)}</textarea><button class="btn block" data-copyx="1" style="margin-top:8px">Cerrar</button></div>`:"") + (S.view==="setup"?renderSetup(): S.lockH?renderLock(S.lockH.s,S.lockH.h): S.view==="form"?(abierta(S.tab)?renderForm():renderLock()): renderHome());
   renderSavebar(); renderSync();
   if(S.versionNueva && S.view!=="form"){ S.versionNueva=false; aplicarVersion(); }
 }
@@ -1202,7 +1240,7 @@ function render(){
 document.addEventListener("click", e=>{
   const b=e.target.closest("button"); if(!b) return;
   const d=b.dataset;
-  if(d.tab){ S.tab=d.tab; S.view="home"; S.f=null; render(); window.scrollTo(0,0); return; }
+  if(d.tab){ S.lockH=null; S.subPedida=false; S.tab=d.tab; S.view="home"; S.f=null; render(); window.scrollTo(0,0); return; }
   if(b.id==="btn-sync"){ sync(); toast(Object.keys(S.outbox).length?"Subiendo datos…":"Buscando novedades…"); return; }
   if(d.new){ nuevo(d.new); return; }
   if(d.instalar){ instalar(); return; }
@@ -1211,7 +1249,8 @@ document.addEventListener("click", e=>{
   if(d.save){ guardar(); return; }
   if(d.edit){ editar(d.edit); return; }
   if(d.del){ if(!armar(b,"Tocá de nuevo para borrar")) return; const r=S.R[d.del]; if(r){ r.borrado=true; put(r); } S.serie=S.serie.filter(x=>x!==d.del); if(S.editId===d.del){ S.f=null; S.editId=null; S.view="home"; } toast("Borrado"); render(); return; }
-  if(d.sub){ S.sub=d.sub; render(); return; }
+  if(d.sub){ S.sub=d.sub; S.subPedida=true; render(); return; }
+  if(d.lkback){ S.lockH=null; render(); return; }
   if(d.set!==undefined){
     const k=d.set, v=d.v;
     if(k==="loteF"){ S.loteF=v||null; render(); return; }
@@ -1243,8 +1282,8 @@ document.addEventListener("click", e=>{
   if(d.impok){ aplicarImport(); return; }
   if(d.copyx){ S.copyTxt=null; render(); return; }
   if(d.ajok){ guardarAjustes(); return; }
-  if(d.unlock){ desbloquear(); return; }
-  if(d.lockall){ delete S.unl[S.set.estab]; persist(); S.tab="campo"; S.view="home"; toast("Celular bloqueado"); render(); return; }
+  if(d.unlock){ desbloquear(d.unlock); return; }
+  if(d.lockall){ S.lockH=null; delete S.unl[S.set.estab]; persist(); S.tab="campo"; S.view="home"; toast("Celular bloqueado"); render(); return; }
   if(d.catadd){ const n=$("#cat-nuevo").value.trim(); if(!n) return; const E=estab(); E.cats=JSON.parse(JSON.stringify(catsE(E))); if(E.cats.some(c=>norm(c.nombre)===norm(n))){ toast("Esa categoría ya existe"); return; } E.cats.push({id:"c-"+uid(),nombre:n}); saveEstab(E); render(); return; }
   if(d.catdel){ if(!armar(b,"¿Quitar?")) return; const E=estab(); E.cats=JSON.parse(JSON.stringify(catsE(E))).filter(c=>c.id!==d.catdel); saveEstab(E); render(); return; }
   if(d.lnew){ S.loteEd={id:"l-"+uid(),_nuevo:true,comp:{}}; render(); return; }
@@ -1276,6 +1315,9 @@ function guardarAjustes(){
   const v=$("#aj-estab").value;
   const E=estab(), C={...claves(E)}; let cambio=false;
   document.querySelectorAll("[data-clave]").forEach(i=>{ const k=i.dataset.clave, nv=i.value.trim(); if((C[k]||"")!==nv){ C[k]=nv; cambio=true; } });
+  const Hj={...(C.hojas||{})};
+  document.querySelectorAll("[data-hclave]").forEach(i=>{ const k=i.dataset.hclave, nv=i.value.trim(); if((Hj[k]||"")!==nv){ if(nv) Hj[k]=nv; else delete Hj[k]; cambio=true; } });
+  C.hojas=Hj;
   if(cambio){ E.claves=C; saveEstab(E); const u=S.unl[S.set.estab]=S.unl[S.set.estab]||{}; if(C.oficina) u.oficina=C.oficina; }
   S.set.operario=$("#aj-op").value.trim(); S.set.api=$("#aj-api").value.trim(); S.set.codigo=$("#aj-cod").value.trim();
   S.set.estab=v;
