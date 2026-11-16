@@ -200,7 +200,9 @@ const TIPOS = {
   lote:{n:"Recorrida de lote",pl:"Recorridas de lote"}, hacienda:{n:"Entrada/salida de hacienda",pl:"Entradas y salidas de hacienda"}, instal:{n:"Bebidas, molino y alambrados",pl:"Controles de instalaciones"}
 };
 const CATS_BASE = [{id:"vacasPre",nombre:"Vacas preñadas",vientre:true,ev:1},{id:"vacasVac",nombre:"Vacas vacías",ev:0.85},{id:"vacasCria",nombre:"Vacas con cría",ev:1},{id:"vaqPre",nombre:"Vaquillonas preñadas",vientre:true,ev:0.9},{id:"vaq",nombre:"Vaquillonas",ev:0.7},{id:"terneros",nombre:"Terneros/as",ev:0.4},{id:"toros",nombre:"Toros",ev:1.3}];
-const MOVS = [["venta","Venta"],["refugo","Refugo"],["compra","Compra"],["trasEnt","Entra de otro campo"],["trasSal","Sale a otro campo"],["consumo","Consumo"]];
+const MOVS = [["venta","Venta"],["refugo","Refugo"],["compra","Compra"],["trasEnt","Entra de otro campo"],["trasSal","Sale a otro campo"],["consumo","Consumo"],["otras","Salida (otras causas)"]];
+/* una muerte puede ser de varias cabezas (campo "cabezas"); el resto de los registros cuenta 1 */
+const nCab = arr => arr.reduce((a,e)=>a+(e.tipo==="muerte"?(num(e.cabezas)||1):1),0);
 const PASTURAS = ["Campo natural","Pastura implantada","Promoción de raigrás","Verdeo de invierno","Verdeo de verano","Rastrojo","Bajo / monte"];
 const BRM = [["bueno","Bueno"],["regular","Regular","warn"],["malo","Malo","bad"]];
 const CAUSAS_TERNERO = ["Distocia","Débil al nacer","Frío / lluvia","Predador","Diarrea","Desconocida"];
@@ -316,7 +318,7 @@ function ultRecorrida(l){ return eventos().filter(e=>e.tipo==="lote"&&matchLote(
 function calcLote(l,desde,hasta){
   const ev=eventos().filter(e=>matchLote(e,l)), evc=ev.filter(e=>(!desde||e.fecha.slice(0,10)>=desde)&&(!hasta||e.fecha.slice(0,10)<=hasta));
   const par=evc.filter(e=>e.tipo==="parto"), muertosP=par.filter(e=>e.estado==="muerto").length, vivos=par.length-muertosP;
-  const mt=evc.filter(e=>e.tipo==="muerte"&&e.categoria==="ternero").length, ma=evc.filter(e=>e.tipo==="muerte"&&e.categoria!=="ternero").length;
+  const mt=nCab(evc.filter(e=>e.tipo==="muerte"&&e.categoria==="ternero")), ma=nCab(evc.filter(e=>e.tipo==="muerte"&&e.categoria!=="ternero"));
   const tac=evc.filter(e=>e.tipo==="tacto"), pre=tac.filter(e=>e.resultado!=="vacia").length;
   const vientres=vientresLote(l), cab=cabLote(l), adultos=cab-ternLote(l);
   const fs=par.map(e=>e.fecha).sort(), dias=fs.length?Math.max(1,Math.round((new Date(fs[fs.length-1])-new Date(fs[0]))/864e5)+1):null;
@@ -523,7 +525,8 @@ function formMuerte(f){
   const cat=f.categoria||"ternero";
   return `<h1>Muerte</h1>
   ${fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaquillona"],["ternero","Ternero"],["toro","Toro"]],cat))}
-  ${idBlock("animal",f,"Animal")}
+  ${fld("Cantidad (cabezas)", inp("cabezas",f.cabezas,{type:"number",mode:"numeric",ph:"1"}), num(f.cabezas)>1?"Varias cabezas juntas: la identificación es opcional.":"Para cargar varias muertes juntas (por ejemplo una mortandad), poné la cantidad.")}
+  ${idBlock("animal",f,num(f.cabezas)>1?"Animal (opcional)":"Animal")}
   ${lotePick(f)}
   ${fld("Causa probable", chipsPick("causa",cat==="ternero"?CAUSAS_TERNERO:CAUSAS_ADULTO,f.causa))}
   ${fld("Potrero", inp("potrero",f.potrero,{ph:"Potrero"}))}${potrerosRecientes(f)}
@@ -654,8 +657,9 @@ function validar(f){
     if(!f.sexo) return "Marcá si es macho o hembra";
     if(f.terneroTipo!=="prov" && !String(f.ternero||"").trim()) return "Falta la caravana del ternero";
   }
-  if(["muerte","toro","tacto","destete","pesada"].includes(f.tipo) && (f.animalTipo||"visual")!=="sin" && !String(f.animal||"").trim()) return "Falta la identificación del animal";
+  if(["muerte","toro","tacto","destete","pesada"].includes(f.tipo) && !(f.tipo==="muerte"&&num(f.cabezas)>1) && (f.animalTipo||"visual")!=="sin" && !String(f.animal||"").trim()) return "Falta la identificación del animal";
   if(f.tipo==="muerte" && !f.categoria) f.categoria="ternero";
+  if(f.tipo==="muerte" && f.cabezas!=null && String(f.cabezas).trim()!=="" && !(num(f.cabezas)>=1)) return "La cantidad tiene que ser 1 o más";
   if(f.tipo==="tacto" && !f.resultado) return "Marcá el resultado del tacto";
   if(f.tipo==="cc" && !f.valor) return "Marcá la condición corporal";
   if((f.tipo==="destete"||f.tipo==="pesada") && num(f.peso)==null) return "Falta el peso";
@@ -827,7 +831,7 @@ function rowEv(e){
   let d="";
   if(e.tipo==="parto") d=`Madre ${e.madre?fmtEID(e.madre):"sin ident."} · ${e.sexo||"?"} · ${e.estado}${e.peso?" · "+e.peso+" kg":""}`;
   else if(e.tipo==="tacto") d=`${e.animal?fmtEID(e.animal):"s/i"} · ${e.resultado}`;
-  else if(e.tipo==="muerte") d=`${e.categoria||""} ${e.animal?fmtEID(e.animal):""} · ${e.causa||"sin causa"}`;
+  else if(e.tipo==="muerte") d=`${num(e.cabezas)>1?num(e.cabezas)+" × ":""}${e.categoria||""} ${e.animal?fmtEID(e.animal):""} · ${e.causa||"sin causa"}`;
   else if(e.tipo==="sanidad") d=`${e.detalle||""}${e.cantidad?" · "+e.cantidad+" animales":""}`;
   else if(e.tipo==="toro") d=`${fmtEID(e.animal)} · ${e.resultado}`;
   else if(e.tipo==="lote") d=`${e.lote||""} · ${({ingreso:"entrada",egreso:"salida",parcela:"cambio de parcela"})[e.movimiento]||"control"}${e.parcela?" · parcela "+e.parcela+(num(e.haParcela)?" ("+f1(num(e.haParcela))+" ha)":""):""}${e.pastura?" · pastura "+e.pastura:""}${e.remanente?" · rem. "+e.remanente:""}${e.aguada?" · aguada "+e.aguada:""}`;
@@ -1009,8 +1013,8 @@ function calcCamp(c){
   const pesos=des.map(e=>num(e.peso)).filter(x=>x!=null), kgDest=pesos.reduce((a,b)=>a+b,0);
   const toros=lo ? (lo.l?sumCats(lo.l,x=>norm(x.nombre).includes("toro"))||null:null) : num(cfg.toros);
   return {c,cfg,lo,vientres,tac:tac.length,pre,vac,cab,cue,col,partos:par.length,vivos,muertosP,machos:par.filter(e=>e.sexo==="M").length,hembras:par.filter(e=>e.sexo==="H").length,dist:par.filter(e=>Number(e.dificultad)>=3).length,
-    mt:mt.length,dest:des.length,pesoDest:pesos.length?kgDest/pesos.length:null,kgDest,
-    prenez:pct(pre,tac.length),pcab:pct(cab,pre),paricion:pct(par.length,vientres),mortPeri:pct(muertosP,par.length),mortDest:pct(mt.length,vivos),destete:pct(des.length,vientres),kgVaca:vientres&&pesos.length?kgDest/vientres:null,perdida:pre?pct(pre-par.length,pre):null,torosPct:pct(toros,vientres),par};
+    mt:nCab(mt),dest:des.length,pesoDest:pesos.length?kgDest/pesos.length:null,kgDest,
+    prenez:pct(pre,tac.length),pcab:pct(cab,pre),paricion:pct(par.length,vientres),mortPeri:pct(muertosP,par.length),mortDest:pct(nCab(mt),vivos),destete:pct(des.length,vientres),kgVaca:vientres&&pesos.length?kgDest/vientres:null,perdida:pre?pct(pre-par.length,pre):null,torosPct:pct(toros,vientres),par};
 }
 function sem(v,meta,mayor=true){ if(v==null) return ""; const ok=mayor?v>=meta:v<=meta, cerca=mayor?v>=meta*0.93:v<=meta*1.5; return ok?"ok":cerca?"warn":"bad"; }
 function renderIndicadores(){
@@ -1166,7 +1170,7 @@ function calcIdx(c){
   const pv=ev.filter(e=>e.tipo==="pesada"&&e.categoria==="vaca").map(e=>num(e.peso)).filter(x=>x!=null), pesoVaca=pv.length?avg(pv):num(cfg.pesoVaca);
   const hz=ev.filter(e=>e.tipo==="hacienda"), kgM=m=>hz.filter(e=>m.includes(e.mov)).reduce((a,e)=>a+(num(e.kgTot)||0),0), cbM=m=>hz.filter(e=>m.includes(e.mov)).reduce((a,e)=>a+(num(e.cabezas)||0),0);
   const kgIni=k.lo?null:num(cfg.kgIni), kgFin=k.lo?null:num(cfg.kgFin);
-  const prod=kgIni!=null&&kgFin!=null?kgFin+kgM(["venta","refugo","trasSal"])-kgM(["compra","trasEnt"])-kgIni+kgM(["consumo"]):null;
+  const prod=kgIni!=null&&kgFin!=null?kgFin+kgM(["venta","refugo","trasSal","otras"])-kgM(["compra","trasEnt"])-kgIni+kgM(["consumo"]):null;
   const L=k.lo?(k.lo.l?[k.lo.l]:[]):lotesE(E), evT=L.reduce((a,l)=>a+evLote(l),0), cabL=L.reduce((a,l)=>a+cabLote(l),0), cabIni=(k.lo?null:num(cfg.cabIni))||cabL||null;
   return {...k, ha, ini, hz:hz.length, conc21:pct(enD(21),k.partos), conc42:pct(enD(42),k.partos), iep:avg(iep), iepN:iep.length, adj205:avg(adj), adjN:adj.length, pesoVaca, pvN:pv.length,
     relTV:pesoVaca&&k.pesoDest?pct(k.pesoDest,pesoVaca):null, kgHa:ha&&k.kgDest?k.kgDest/ha:null, evHa:ha&&evT?evT/ha:null, cabHa:ha&&cabL?cabL/ha:null, prod, prodHa:prod!=null&&ha?prod/ha:null,
@@ -1461,7 +1465,7 @@ document.addEventListener("change", e=>{
   if(anotarLote(e.target)) return;
   const t=e.target, d=t.dataset;
   if(t.id==="sel-estab"){ S.set.estab=t.value; S.filt=null; S.why=null; S.loteF=null; persist(); render(); return; }
-  if(d.f && S.f){ S.f[d.f]=t.value; if(d.f==="tarea"){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
+  if(d.f && S.f){ S.f[d.f]=t.value; if(d.f==="tarea"||(d.f==="cabezas"&&S.f.tipo==="muerte")){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
   if(d.filt){ S.filt[d.filt]=t.value; S.why=null; render(); return; }
   if(d.camp){ const E=estab(); E.campanas[S.campSel]=E.campanas[S.campSel]||{}; E.campanas[S.campSel][d.camp]=t.type==="number"?num(t.value):t.value; saveEstab(E); render(); return; }
   if(d.catev){ const E=estab(); E.cats=JSON.parse(JSON.stringify(catsE(E))); const c=E.cats.find(x=>x.id===d.catev); if(c){ c.ev=num(t.value); saveEstab(E); } render(); return; }
