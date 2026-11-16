@@ -106,6 +106,7 @@ th{font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.03e
 .banner{background:var(--warnbg);color:#5C4300;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:15px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom));background:var(--brand);color:#fff;padding:12px 18px;border-radius:12px;z-index:50;font-weight:600;max-width:90vw;text-align:center}
 .serie{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto}
+.estabbar{display:flex;align-items:center;gap:10px;background:var(--brand);color:#fff;border-radius:12px;padding:8px 12px;margin-bottom:12px}.estabbar label{font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.04em}.estabbar select{min-height:44px;padding:8px;flex:1;color:var(--ink);background:#fff}
 .kblock{border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0}.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0 10px}.kgrid .field>label{text-transform:none;letter-spacing:0}
 .subtabs{display:flex;gap:6px;overflow-x:auto;margin:-2px 0 12px;padding-bottom:4px}
 .subtabs button{border:2px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-weight:600;white-space:nowrap}
@@ -140,7 +141,8 @@ svg text{font-family:system-ui,sans-serif}
 // Dirección del servidor (Apps Script /exec). También se puede pasar en el link: ?api=...
 const API_DEFAULT = "https://script.google.com/macros/s/AKfycbwf5wg1hXDu_sKGDq52Z4w3L8AZQvkKbsZ8qCnUTbwFj2zCo1jmhZuMSp9CZZGerYZ8Pw/exec";
 const ESTAB_DEFAULT = {id:"los-ranqueles", nombre:"Los Ranqueles"};
-const ESTAB_NOMBRES = {"los-ranqueles":"Los Ranqueles","apsavet":"Apsavet"};
+const ESTAB_NOMBRES = {"los-ranqueles":"Los Ranqueles","el-grillo":"El Grillo","apsavet":"Apsavet"};
+const esAdmin = () => S.set.rol==="admin";
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MESES_L = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 
@@ -296,14 +298,15 @@ function calcLote(l,desde,hasta){
 function estabRec(id){ id=id||S.set.estab; const r=S.R["estab-"+id]; return r && !r.borrado ? r : null; }
 function estab(){
   let r=estabRec();
-  if(!r){ r={clase:"config", tipo:"estab", id:"estab-"+(S.set.estab||ESTAB_DEFAULT.id), estab:S.set.estab||ESTAB_DEFAULT.id, nombre:ESTAB_NOMBRES[S.set.estab||ESTAB_DEFAULT.id]||S.set.estab, plan:JSON.parse(JSON.stringify(PLAN_BASE)), metas:{...METAS_BASE}, campanas:{}, potreros:[], detalle:"" }; }
+  if(!r){ r={clase:"config", tipo:"estab", id:"estab-"+(S.set.estab||ESTAB_DEFAULT.id), estab:S.set.estab||ESTAB_DEFAULT.id, nombre:(S.set.estabNombre&&S.set.rol!=="admin"?S.set.estabNombre:null)||ESTAB_NOMBRES[S.set.estab||ESTAB_DEFAULT.id]||campoNombre(S.set.estab)||S.set.estab, plan:JSON.parse(JSON.stringify(PLAN_BASE)), metas:{...METAS_BASE}, campanas:{}, potreros:[], detalle:"" }; }
   if(!r.plan) r.plan=JSON.parse(JSON.stringify(PLAN_BASE));
   if(!r.metas) r.metas={...METAS_BASE};
   if(!r.campanas) r.campanas={};
   return r;
 }
 function saveEstab(r){ r.detalle = r.nombre; put(r); }
-const listaEstabs = () => { const m={}; Object.values(S.R).filter(r=>r.tipo==="estab"&&!r.borrado).forEach(r=>m[r.estab]=r.nombre); if(S.set.estab && !m[S.set.estab]) m[S.set.estab]=estab().nombre; if(!Object.keys(m).length) m[ESTAB_DEFAULT.id]=ESTAB_DEFAULT.nombre; return m; };
+const campoNombre = id => ((S.set.campos||[]).find(c=>c.estab===id)||{}).nombre;
+const listaEstabs = () => { const m={}; if(esAdmin()) (S.set.campos||[]).forEach(c=>m[c.estab]=c.nombre); else if(S.set.rol==="campo"){ return {[S.set.estab]:estab().nombre}; } Object.values(S.R).filter(r=>r.tipo==="estab"&&!r.borrado).forEach(r=>m[r.estab]=r.nombre); if(S.set.estab && !m[S.set.estab]) m[S.set.estab]=estab().nombre; if(!Object.keys(m).length) m[ESTAB_DEFAULT.id]=ESTAB_DEFAULT.nombre; return m; };
 
 /* Campaña = año del entore. Parto de 2027 → campaña 2026 (entore oct–dic 2026). */
 function campOf(r){
@@ -341,14 +344,21 @@ async function sync(){
     const r=await fetch(S.set.api+(S.set.api.includes("?")?"&":"?")+"codigo="+encodeURIComponent(S.set.codigo)+"&desde="+desde);
     const j=await r.json();
     if(!j.ok) throw new Error(j.error||"error");
+    if(j.rol) S.set.rol = j.rol;   // el servidor viejo no manda rol: la app sigue como antes
+    if(j.rol==="admin"){ S.set.campos = j.campos||[]; }
     if(j.estab && j.estab!==S.set.estab){ S.set.estab=j.estab; S.filt=null; S.why=null; }
+    if(j.nombre) S.set.estabNombre=j.nombre;
+    if(j.rol==="campo" && j.estab){
+      // este celular es de un solo campo: se borran de acá los datos de otros campos (lo pendiente de subir no se toca)
+      Object.keys(S.R).forEach(id=>{ const r=S.R[id]; if(!S.outbox[id] && (r.tipo==="acceso" || (r.estab && r.estab!==j.estab))) delete S.R[id]; });
+    }
     (j.registros||[]).forEach(rec=>{ if(!S.outbox[rec.id]) S.R[rec.id]=rec; });
-    S.lastSync=j.ahora; S.syncState="ok"; S.syncErr="";
+    S.lastSync=j.ahora; S.syncState="ok"; S.syncErr=""; S.codMal=false;
     persist();
     if(!S.f && S.view!=="setup") render();
   }catch(e){
     S.syncState="err"; S.syncErr=String(e.message||e);
-    if(S.syncErr.includes("CODIGO")) S.syncErr="El código de acceso no es válido";
+    if(S.syncErr.includes("CODIGO")){ S.syncErr="El código de acceso no es válido"; S.codMal=true; }
   }
   renderSync();
 }
@@ -712,7 +722,10 @@ function lotesCampo(){
 function banners(){
   let h="";
   if(!S.set.api) h+=`<div class="banner"><b>Sin servidor configurado.</b> Lo que cargues queda guardado en este celular. Configuralo en Oficina → Ajustes.</div>`;
+  else if(S.syncState==="err" && S.codMal) h+=`<div class="banner"><b>El código de acceso no es válido.</b> Pedile el código nuevo al asesor y escribilo acá. Lo cargado sigue guardado en el celular.
+    <div style="display:flex;gap:8px;margin-top:8px"><input type="text" id="cod-nuevo" autocapitalize="characters" autocomplete="off" placeholder="Código"><button class="btn solid" data-codnuevo="1">Guardar</button></div></div>`;
   else if(S.syncState==="err") h+=`<div class="banner"><b>No se pudo subir.</b> ${esc(S.syncErr)}. Los datos siguen guardados en el celular.</div>`;
+  if(esAdmin()){ const L=listaEstabs(); h+=`<div class="estabbar"><label for="sel-estab">Campo</label><select id="sel-estab">${Object.entries(L).map(([id,n])=>`<option value="${esc(id)}" ${id===S.set.estab?"selected":""}>${esc(n)}</option>`).join("")}</select></div>`; }
   return h + bannerInstalar();
 }
 /* ----- instalar en el celular ----- */
@@ -1191,8 +1204,7 @@ function guardarLote(){
 function renderAjustes(){
   const E=estab(), L=listaEstabs(), M=E.metas;
   return `<h1>Ajustes</h1>
-  <div class="card">${fld("Establecimiento",`<select id="aj-estab">${Object.entries(L).map(([id,n])=>`<option value="${id}" ${id===S.set.estab?"selected":""}>${esc(n)}</option>`).join("")}</select>`)}
-    ${fld("Agregar otro establecimiento",`<div style="display:flex;gap:8px"><input type="text" id="aj-nuevo" placeholder="Nombre"><button class="btn" data-nuevoest="1">Agregar</button></div>`)}
+  <div class="card">${(esAdmin()||!S.set.rol)?fld("Establecimiento",`<select id="aj-estab">${Object.entries(L).map(([id,n])=>`<option value="${id}" ${id===S.set.estab?"selected":""}>${esc(n)}</option>`).join("")}</select>`):`<p style="margin-top:0">Campo: <b>${esc(E.nombre)}</b></p>`}
     ${fld("Tu nombre (quién carga)",`<input type="text" id="aj-op" value="${esc(S.set.operario)}">`)}
     ${fld("Dirección del servidor",`<input type="url" id="aj-api" value="${esc(S.set.api)}" placeholder="https://script.google.com/macros/s/…/exec">`)}
     ${fld("Código de acceso",`<input type="text" id="aj-cod" value="${esc(S.set.codigo)}" autocapitalize="off">`)}
@@ -1200,10 +1212,42 @@ function renderAjustes(){
       ${editorClaves(E)}
       <button class="btn block" data-lockall="1" style="margin-top:8px">Bloquear este celular</button></div>
     <button class="btn solid block" data-ajok="1" style="margin-top:12px">Guardar ajustes</button></div>
+  ${esAdmin()?renderCampos():""}
   <div class="card"><h3 style="margin-top:0">Metas de ${esc(E.nombre)}</h3>
     <div class="row2">${[["prenez","Preñez %"],["cabeza","Preñez cabeza %"],["mortPeri","Mortandad perinatal %"],["mortDest","Mortandad parto-destete %"],["destete","Destete %"],["kgVaca","Kg destetados / vaca"],["torosMin","Toros mín. %"],["torosMax","Toros máx. %"]].map(([k,l])=>fld(l,`<input type="number" inputmode="decimal" data-meta="${k}" value="${M[k]??""}">`)).join("")}</div></div>
   <div class="card"><h3 style="margin-top:0">Instalar en el celular</h3><p class="small" style="margin:0 0 8px">${textoInstalar()}</p>${INST.evento&&!instalada()?`<button class="btn solid block" data-instalar="1">Instalar</button>`:""}</div>
   <p class="small muted">Registros en este celular: ${eventos().length} · sin subir: ${Object.keys(S.outbox).length}${S.lastSync?` · última sincronización: ${new Date(S.lastSync).toLocaleString("es-AR")}`:""}</p>`;
+}
+/* ----- campos y códigos (solo administrador) ----- */
+const BASE_LINK = () => location.href.split("?")[0].split("#")[0];
+const linkCampo = c => `${BASE_LINK()}?codigo=${encodeURIComponent(c.codigo)}&estab=${encodeURIComponent(c.estab)}`;
+function camposAdmin(){
+  const m={}; (S.set.campos||[]).forEach(c=>m[c.codigo]=c);
+  Object.values(S.R).filter(r=>r.tipo==="acceso").forEach(r=>{ if(r.borrado) delete m[r.codigo]; else m[r.codigo]={codigo:r.codigo,estab:r.estab,nombre:r.nombre,pend:!!S.outbox[r.id]}; });
+  return Object.values(m).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+}
+function renderCampos(){
+  const C=camposAdmin();
+  return `<div class="card"><h3 style="margin-top:0">Campos y códigos</h3>
+    <p class="small muted" style="margin-top:0">Cada campo entra con su código y solo ve y carga sus datos. Vos, con el código de administrador, ves todos. Mandale a cada campo su link.</p>
+    <div class="list">${C.map(c=>`<div class="kblock" style="margin:6px 0"><b>${esc(c.nombre)}</b> · código <b>${esc(c.codigo)}</b>${c.pend?` <span class="chip">sin subir</span>`:""}
+      <div class="small muted" style="word-break:break-all;margin:4px 0">${esc(linkCampo(c))}</div>
+      <button class="btn" data-copylink="${esc(c.codigo)}">Copiar link</button></div>`).join("")||`<p class="muted">Todavía no hay campos.</p>`}</div>
+    ${fld("Agregar campo",`<div style="display:flex;gap:8px"><input type="text" id="cp-nuevo" placeholder="Nombre del campo"><button class="btn" data-nuevocampo="1">Agregar</button></div>`,"Se crea el campo con un código nuevo.")}
+    <details style="margin-top:8px"><summary class="small">Pasar al servidor los datos que tiene este equipo</summary>
+      <p class="small">Sube de nuevo todo lo que está guardado en este equipo (${Object.values(S.R).length} registros). Usalo una vez, después de cambiar el servidor.</p>
+      <button class="btn block" data-subirtodo="1">Subir todo</button></details></div>`;
+}
+function nuevoCampo(){
+  const n=($("#cp-nuevo")||{}).value?.trim(); if(!n){ toast("Escribí el nombre del campo"); return; }
+  const id=slug(n);
+  if(camposAdmin().some(c=>c.estab===id)){ toast("Ese campo ya tiene código"); return; }
+  const A="ABCDEFGHJKMNPQRSTUVWXYZ23456789", rnd=k=>Array.from(crypto.getRandomValues(new Uint32Array(k)),x=>A[x%A.length]).join("");
+  const pre=(norm(n).replace(/[^a-z0-9]/g,"").toUpperCase()+"XXX").slice(0,3);
+  const codigo=pre+"-"+rnd(4);
+  if(!estabRec(id)) saveEstab({clase:"config",tipo:"estab",id:"estab-"+id,estab:id,nombre:n,plan:JSON.parse(JSON.stringify(PLAN_BASE)),metas:{...METAS_BASE},campanas:{},potreros:[]});
+  put({clase:"config",tipo:"acceso",id:"acceso-"+codigo,codigo,estab:id,nombre:n});
+  toast(`${n}: código ${codigo}`); render();
 }
 function editorClaves(E){
   const C=claves(E), ko=String(C.oficina||"").trim();
@@ -1244,6 +1288,10 @@ document.addEventListener("click", e=>{
   if(b.id==="btn-sync"){ sync(); toast(Object.keys(S.outbox).length?"Subiendo datos…":"Buscando novedades…"); return; }
   if(d.new){ nuevo(d.new); return; }
   if(d.instalar){ instalar(); return; }
+  if(d.codnuevo){ const v=($("#cod-nuevo").value||"").trim().toUpperCase(); if(!v){ toast("Escribí el código"); return; } S.set.codigo=v; S.codMal=false; S.syncState="idle"; persist(); render(); sync(); return; }
+  if(d.copylink){ const c=camposAdmin().find(x=>x.codigo===d.copylink); if(c) copiar(`App de rodeo de cría · ${c.nombre}\n${linkCampo(c)}`); return; }
+  if(d.nuevocampo){ nuevoCampo(); return; }
+  if(d.subirtodo){ if(!armar(b,"Tocá de nuevo para subir todo")) return; Object.keys(S.R).forEach(id=>S.outbox[id]=true); persist(); sync(); toast("Subiendo todo…"); render(); return; }
   if(d.instno){ INST.oculto=true; try{ localStorage.setItem("rc-inst-no","1"); }catch(_){} toast("Lo podés instalar después desde Oficina → Ajustes"); render(); return; }
   if(d.back){ S.f=null; S.editId=null; S.view="home"; render(); return; }
   if(d.save){ guardar(); return; }
@@ -1291,7 +1339,7 @@ document.addEventListener("click", e=>{
   if(d.lcancel){ S.loteEd=null; render(); return; }
   if(d.lsave){ guardarLote(); return; }
   if(d.ldel){ if(!armar(b,"Tocá de nuevo para quitar")) return; const E=estab(); E.lotes=(E.lotes||[]).filter(x=>x.id!==S.loteEd.id); saveEstab(E); S.loteEd=null; toast("Lote quitado"); render(); return; }
-  if(d.nuevoest){ const n=$("#aj-nuevo").value.trim(); if(!n) return; const id=slug(n); S.set.estab=id; if(!estabRec(id)) saveEstab({clase:"config",tipo:"estab",id:"estab-"+id,estab:id,nombre:n,plan:JSON.parse(JSON.stringify(PLAN_BASE)),metas:{...METAS_BASE},campanas:{},potreros:[]}); S.filt=null; persist(); toast("Establecimiento agregado: "+n); render(); return; }
+  if(d.nuevoest && (esAdmin()||!S.set.rol)){ const n=$("#aj-nuevo").value.trim(); if(!n) return; const id=slug(n); S.set.estab=id; if(!estabRec(id)) saveEstab({clase:"config",tipo:"estab",id:"estab-"+id,estab:id,nombre:n,plan:JSON.parse(JSON.stringify(PLAN_BASE)),metas:{...METAS_BASE},campanas:{},potreros:[]}); S.filt=null; persist(); toast("Establecimiento agregado: "+n); render(); return; }
   if(d.setup){ S.set.operario=$("#su-op").value.trim(); S.set.codigo=$("#su-cod").value.trim(); const a=$("#su-api"); if(a) S.set.api=a.value.trim(); if(!S.set.operario){ toast("Escribí tu nombre"); return; } if(!S.set.estab) S.set.estab=ESTAB_DEFAULT.id; S.view="home"; persist(); render(); sync(); return; }
 });
 // confirmación sin ventanas emergentes: el primer toque arma, el segundo confirma
@@ -1312,7 +1360,7 @@ function preguntar(){
   S.filt={...F}; S.why=why.length?why:["todo"]; render();
 }
 function guardarAjustes(){
-  const v=$("#aj-estab").value;
+  const v=$("#aj-estab")?$("#aj-estab").value:S.set.estab;
   const E=estab(), C={...claves(E)}; let cambio=false;
   document.querySelectorAll("[data-clave]").forEach(i=>{ const k=i.dataset.clave, nv=i.value.trim(); if((C[k]||"")!==nv){ C[k]=nv; cambio=true; } });
   const Hj={...(C.hojas||{})};
@@ -1330,6 +1378,7 @@ document.addEventListener("input", e=>{
 });
 document.addEventListener("change", e=>{
   const t=e.target, d=t.dataset;
+  if(t.id==="sel-estab"){ S.set.estab=t.value; S.filt=null; S.why=null; S.loteF=null; persist(); render(); return; }
   if(d.f && S.f){ S.f[d.f]=t.value; if(d.f==="tarea"){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
   if(d.filt){ S.filt[d.filt]=t.value; S.why=null; render(); return; }
   if(d.camp){ const E=estab(); E.campanas[S.campSel]=E.campanas[S.campSel]||{}; E.campanas[S.campSel][d.camp]=t.type==="number"?num(t.value):t.value; saveEstab(E); render(); return; }
