@@ -297,10 +297,17 @@ const ternLote = l => sumCats(l,c=>norm(c.nombre).includes("terner"));
 const compTxt = l => catsE().filter(c=>num((l.comp||{})[c.id])).map(c=>num(l.comp[c.id])+" "+c.nombre.toLowerCase()).join(" · ") || "Sin animales cargados";
 const cargaTxt = l => { const h=num(l.ha), cab=cabLote(l), mx=num(l.cargaMax); if(!h||!cab) return ""; const c=cab/h; return " · "+f1(c)+(mx?" de "+f1(mx):"")+" cab/ha"+(mx&&c>mx?" (pasada de carga)":""); };
 const diasDesde = s => s ? Math.max(0,Math.floor((Date.now()-new Date(s.slice(0,10)+"T12:00"))/864e5)) : null;
+const ubicTxt = u => { if(!u.potrero) return ""; const dp=u.pdesde?diasDesde(u.pdesde):null; return "Potrero "+esc(u.potrero)+(u.parcela?" · parcela "+esc(u.parcela)+(dp!=null?(dp===0?" desde hoy":` hace ${dp} d`):""):""); };
 function ubicLote(l){
   const mv=eventos().filter(e=>e.tipo==="lote"&&matchLote(e,l)&&(e.movimiento==="ingreso"||e.movimiento==="egreso")).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
-  if(mv) return mv.movimiento==="ingreso" ? {potrero:mv.potrero,desde:mv.fecha} : {potrero:"",desde:"",salio:mv.fecha,de:mv.potrero};
-  return {potrero:l.potrero||"",desde:l.ingreso||""};
+  if(mv && mv.movimiento==="egreso") return {potrero:"",parcela:"",desde:"",salio:mv.fecha,de:mv.potrero};
+  // parcela: la última recorrida del lote que la anotó, desde la entrada al potrero
+  const desdeMv = mv ? mv.fecha : "";
+  const pc=eventos().filter(e=>e.tipo==="lote"&&matchLote(e,l)&&e.parcela&&e.fecha>=desdeMv).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+  const parcela = pc ? pc.parcela : (mv ? "" : (l.parcela||""));
+  const pdesde = pc ? (pc.movimiento==="parcela"||pc.movimiento==="ingreso" ? pc.fecha : "") : "";
+  if(mv) return {potrero:mv.potrero,desde:mv.fecha,parcela,pdesde};
+  return {potrero:l.potrero||"",desde:l.ingreso||"",parcela,pdesde};
 }
 function ultRecorrida(l){ return eventos().filter(e=>e.tipo==="lote"&&matchLote(e,l)).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0]||null; }
 function calcLote(l,desde,hasta){
@@ -437,7 +444,7 @@ function nuevo(tipo, extra={}){
   const f={tipo, fecha:nowLocal(), potrero:S.set.potrero||"", lote:S.set.lote||"", loteId:S.set.loteId||"", madreTipo:"visual", animalTipo:"visual", ...extra};
   if(tipo==="parto"){ f.estado="vivo"; f.dificultad="1"; f.terneroTipo="prov"; }
   if(tipo==="tacto"||tipo==="cc"||tipo==="destete"||tipo==="pesada"){ S.serie=[]; }
-  if(tipo==="lote"){ f.movimiento="control"; const l=loteById(f.loteId); if(l){ const u=ubicLote(l); if(u.potrero) f.potrero=u.potrero; } }
+  if(tipo==="lote"){ f.movimiento="control"; const l=loteById(f.loteId); if(l){ const u=ubicLote(l); if(u.potrero) f.potrero=u.potrero; if(u.parcela) f.parcela=u.parcela; } }
   if(tipo==="toro"){ f.aptitud=""; f.tricho="pend"; f.campylo="pend"; f.animalTipo="visual"; }
   S.f=f; S.view="form"; S.editId=null; gps(f); render(); window.scrollTo(0,0);
 }
@@ -524,9 +531,10 @@ function formLote(f){
   const l=f.loteId&&loteById(f.loteId);
   return `<h1>Recorrida de lote</h1>
   ${lotesE().length?lotePick(f):fld("Lote / rodeo", inp("lote",f.lote,{ph:"Nombre del lote"}))}
-  ${fld("Movimiento", seg("movimiento",[["control","Control"],["ingreso","Entrada al potrero"],["egreso","Salida del potrero"]],f.movimiento))}
-  <div class="row2">${fld("Potrero", inp("potrero",f.potrero,{ph:"Potrero"}))}${fld("Fecha y hora", inp("fecha",f.fecha,{type:"datetime-local"}))}</div>
+  ${fld("Movimiento", seg("movimiento",[["control","Control"],["ingreso","Entrada al potrero"],["parcela","Cambio de parcela"],["egreso","Salida del potrero"]],f.movimiento))}
+  <div class="row2">${fld("Potrero", inp("potrero",f.potrero,{ph:"Potrero"}))}${f.movimiento==="egreso"?"":fld("Parcela", inp("parcela",f.parcela,{ph:"Ej. 3"}))}</div>
   ${potrerosRecientes(f)}
+  ${fld("Fecha y hora", inp("fecha",f.fecha,{type:"datetime-local"}))}
   ${fld("Estado de la pastura", seg("pastura",BRM,f.pastura))}
   ${fld("Aguadas", seg("aguada",BRM,f.aguada))}
   ${fld("Remanente", seg("remanente",[["alto","Alto"],["adecuado","Adecuado"],["bajo","Bajo","warn"]],f.remanente))}
@@ -593,7 +601,7 @@ function construir(f){
     r.categoria="ternero";
   } else {
     const a=identOf(f,"animal"); r.animal=a.id; r.ident=a.ident; r.sena=a.sena;
-    ["categoria","causa","resultado","valor","momento","sexo","aptitud","tricho","campylo","tarea","producto","madre","pastura","remanente","aguada","movimiento","bebida","molino","alambrado","mov","destino"].forEach(k=>{ if(f[k]!=null&&f[k]!=="") r[k]=f[k]; });
+    ["categoria","causa","resultado","valor","momento","sexo","aptitud","tricho","campylo","tarea","producto","madre","pastura","remanente","aguada","movimiento","parcela","bebida","molino","alambrado","mov","destino"].forEach(k=>{ if(f[k]!=null&&f[k]!=="") r[k]=f[k]; });
     if(f.peso!=null) r.peso=num(f.peso); if(f.ce!=null) r.ce=num(f.ce); if(f.edad!=null) r.edad=num(f.edad); if(f.cantidad!=null) r.cantidad=num(f.cantidad); if(f.cabezas!=null&&f.cabezas!=="") r.cabezas=num(f.cabezas);
     if(f.tipo==="lote") r.resultado=f.movimiento||"control";
     if(f.tipo==="hacienda"){ r.resultado=f.mov; r.kgTot=num(f.kg)||(num(f.pesoProm)&&num(f.cabezas)?num(f.pesoProm)*num(f.cabezas):null); if(num(f.pesoProm)) r.pesoProm=num(f.pesoProm); }
@@ -621,6 +629,7 @@ function validar(f){
   if(f.tipo==="novedad" && !f.categoria && !f.obs) return "Contá qué pasa";
   if(f.tipo==="lote" && !String(f.lote||"").trim()) return "Elegí el lote";
   if(f.tipo==="lote" && f.movimiento!=="control" && !String(f.potrero||"").trim()) return "Falta el potrero";
+  if(f.tipo==="lote" && f.movimiento==="parcela" && !String(f.parcela||"").trim()) return "Falta la parcela";
   if(f.tipo==="hacienda" && !f.mov) return "Elegí el movimiento";
   if(f.tipo==="hacienda" && !num(f.cabezas)) return "Faltan las cabezas";
   if(f.tipo==="instal" && !f.bebida && !f.molino && !f.alambrado && !f.obs) return "Marcá al menos un control";
@@ -736,7 +745,7 @@ function lotesCampo(){
   const L=lotesE(); if(!L.length) return "";
   const E=estab();
   return `<h2>Lotes${E.superficie?` <span class="small muted">· ${f1(num(E.superficie))} ha</span>`:""}</h2><div class="card"><div class="list">${L.map(l=>{ const u=ubicLote(l), k=calcLote(l), r=ultRecorrida(l), d=diasDesde(u.desde);
-    return `<div class="item"><span class="grow"><b>${esc(l.nombre)}</b><span class="small muted" style="display:block">${u.potrero?"Potrero "+esc(u.potrero)+(d!=null?` · hace ${d} día${d===1?"":"s"}`:""):"Sin potrero asignado"}${l.ha?" · "+f1(num(l.ha))+" ha":""}${l.pastura?" · "+esc(l.pastura):""}${cargaTxt(l)}</span><span class="small" style="display:block">${compTxt(l)}</span>${l.aguadas?`<span class="small muted" style="display:block">Aguadas: ${esc(l.aguadas)}</span>`:""}${l.salida?`<span class="small muted" style="display:block">Salida prevista: ${fmtD(l.salida)}</span>`:""}${k.partos?`<span class="small muted" style="display:block">Partos ${k.partos} de ${k.vientres} vientres (${f1(k.paricion)}%)${k.muertosP?` · ${k.muertosP} muertos`:""}</span>`:""}${l.obs?`<span class="small" style="display:block">Nota: ${esc(l.obs)}</span>`:""}</span>${r?`<span class="chip ${r.pastura==="malo"?"bad":r.pastura==="regular"?"warn":"ok"}">Recorrido ${fmtD(r.fecha)}</span>`:`<span class="chip warn">Sin recorrida</span>`}</div>`; }).join("")}</div></div>`;
+    return `<div class="item"><span class="grow"><b>${esc(l.nombre)}</b><span class="small muted" style="display:block">${u.potrero?ubicTxt(u)+(d!=null?` · hace ${d} día${d===1?"":"s"}`:""):"Sin potrero asignado"}${l.ha?" · "+f1(num(l.ha))+" ha":""}${l.pastura?" · "+esc(l.pastura):""}${cargaTxt(l)}</span><span class="small" style="display:block">${compTxt(l)}</span>${l.aguadas?`<span class="small muted" style="display:block">Aguadas: ${esc(l.aguadas)}</span>`:""}${l.salida?`<span class="small muted" style="display:block">Salida prevista: ${fmtD(l.salida)}</span>`:""}${k.partos?`<span class="small muted" style="display:block">Partos ${k.partos} de ${k.vientres} vientres (${f1(k.paricion)}%)${k.muertosP?` · ${k.muertosP} muertos`:""}</span>`:""}${l.obs?`<span class="small" style="display:block">Nota: ${esc(l.obs)}</span>`:""}</span>${r?`<span class="chip ${r.pastura==="malo"?"bad":r.pastura==="regular"?"warn":"ok"}">Recorrido ${fmtD(r.fecha)}</span>`:`<span class="chip warn">Sin recorrida</span>`}</div>`; }).join("")}</div></div>`;
 }
 function banners(){
   let h="";
@@ -781,7 +790,7 @@ function rowEv(e){
   else if(e.tipo==="muerte") d=`${e.categoria||""} ${e.animal?fmtEID(e.animal):""} · ${e.causa||"sin causa"}`;
   else if(e.tipo==="sanidad") d=`${e.detalle||""}${e.cantidad?" · "+e.cantidad+" animales":""}`;
   else if(e.tipo==="toro") d=`${fmtEID(e.animal)} · ${e.resultado}`;
-  else if(e.tipo==="lote") d=`${e.lote||""} · ${({ingreso:"entrada",egreso:"salida"})[e.movimiento]||"control"}${e.pastura?" · pastura "+e.pastura:""}${e.remanente?" · rem. "+e.remanente:""}${e.aguada?" · aguada "+e.aguada:""}`;
+  else if(e.tipo==="lote") d=`${e.lote||""} · ${({ingreso:"entrada",egreso:"salida",parcela:"cambio de parcela"})[e.movimiento]||"control"}${e.parcela?" · parcela "+e.parcela:""}${e.pastura?" · pastura "+e.pastura:""}${e.remanente?" · rem. "+e.remanente:""}${e.aguada?" · aguada "+e.aguada:""}`;
   else if(e.tipo==="hacienda") d=`${(MOVS.find(m=>m[0]===e.mov)||["",e.mov])[1]} · ${e.cabezas||"?"} cab ${e.categoria||""}${e.kgTot?" · "+f0(e.kgTot)+" kg":""}${e.destino?" · "+e.destino:""}`;
   else if(e.tipo==="instal") d=`${e.resultado||""}${e.bebida?" · bebida "+e.bebida:""}${e.molino?" · molino "+e.molino:""}${e.alambrado?" · alambr. "+e.alambrado:""}`;
   else if(e.tipo==="novedad") d=`${e.categoria||""} ${e.obs?"· "+e.obs.slice(0,50):""}`;
@@ -943,7 +952,7 @@ function textoResumen(rs,titulo){
 }
 async function copiar(txt){ try{ await navigator.clipboard.writeText(txt); toast("Copiado. Pegalo en WhatsApp."); }catch(_){ S.copyTxt=txt; render(); window.scrollTo(0,0); } }
 function csv(rs){
-  const cols=["fecha","tipo","campana","animal","ident","sena","madre","madreIdent","madreSena","sexo","estado","resultado","valor","peso","dificultad","causa","categoria","potrero","lote","detalle","producto","cantidad","ce","aptitud","tricho","campylo","pastura","remanente","aguada","movimiento","cabezas","bebida","molino","alambrado","mov","kgTot","destino","operario","obs","lat","lng"];
+  const cols=["fecha","tipo","campana","animal","ident","sena","madre","madreIdent","madreSena","sexo","estado","resultado","valor","peso","dificultad","causa","categoria","potrero","parcela","lote","detalle","producto","cantidad","ce","aptitud","tricho","campylo","pastura","remanente","aguada","movimiento","cabezas","bebida","molino","alambrado","mov","kgTot","destino","operario","obs","lat","lng"];
   const q=v=>{ v=v==null?"":String(v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const body=[cols.join(";")].concat(rs.map(r=>cols.map(c=>q(c==="campana"?campOf(r):r[c])).join(";"))).join("\n");
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+body],{type:"text/csv"})); a.download=`rodeo-cria-${S.set.estab}-${todayStr()}.csv`; a.click();
@@ -1186,7 +1195,7 @@ function renderLotes(){
     <div class="kpi"><span>Carga</span><b>${ha?f1(cab/ha):"—"}</b><small>cab/ha en lotes</small></div>
     <div class="kpi"><span>Carga EV</span><b>${ha?f1(L.reduce((a,l)=>a+evLote(l),0)/ha):"—"}</b><small>EV/ha en lotes</small></div>
   </div>
-  ${S.loteEd?formLoteEd(S.loteEd):`<div class="card">${L.length?`<div class="list">${L.map(l=>{ const u=ubicLote(l); return `<div class="item"><span class="grow"><b>${esc(l.nombre)}</b><span class="small muted" style="display:block">${u.potrero?"Potrero "+esc(u.potrero):"Sin potrero"}${l.ha?" · "+f1(num(l.ha))+" ha":""}${l.pastura?" · "+esc(l.pastura):""}${cargaTxt(l)}</span><span class="small" style="display:block">${compTxt(l)}</span></span><button class="chip" data-led="${l.id}">Editar</button></div>`; }).join("")}</div>`:`<p class="muted" style="margin-top:0">Todavía no hay lotes. Agregá el primero con sus cabezas por categoría.</p>`}
+  ${S.loteEd?formLoteEd(S.loteEd):`<div class="card">${L.length?`<div class="list">${L.map(l=>{ const u=ubicLote(l); return `<div class="item"><span class="grow"><b>${esc(l.nombre)}</b><span class="small muted" style="display:block">${u.potrero?ubicTxt(u):"Sin potrero"}${l.ha?" · "+f1(num(l.ha))+" ha":""}${l.pastura?" · "+esc(l.pastura):""}${cargaTxt(l)}</span><span class="small" style="display:block">${compTxt(l)}</span></span><button class="chip" data-led="${l.id}">Editar</button></div>`; }).join("")}</div>`:`<p class="muted" style="margin-top:0">Todavía no hay lotes. Agregá el primero con sus cabezas por categoría.</p>`}
     <button class="btn solid block" data-lnew="1" style="margin-top:10px">Agregar lote</button></div>`}
   <details class="card"><summary>Categorías del rodeo</summary>
     <p class="small muted">Se usan para cargar las cabezas de cada lote. Marcá las que cuentan como vientre para el % de parición. EV = equivalente vaca de cada categoría, para la carga en EV/ha.</p>
@@ -1203,7 +1212,8 @@ function renderLotes(){
 function formLoteEd(l){
   return `<div class="card"><h3 style="margin-top:0">${l._nuevo?"Nuevo lote":"Editar lote"}</h3>
     ${fld("Nombre del lote",`<input type="text" id="le-nombre" value="${esc(l.nombre||"")}" placeholder="Ej. Vacas 1° servicio">`)}
-    <div class="row2">${fld("Potrero",`<input type="text" id="le-potrero" value="${esc(l.potrero||"")}">`)}${fld("Hectáreas",`<input type="number" inputmode="decimal" id="le-ha" value="${l.ha??""}">`)}</div>
+    <div class="row2">${fld("Potrero",`<input type="text" id="le-potrero" value="${esc(l.potrero||"")}">`)}${fld("Parcela",`<input type="text" id="le-parcela" value="${esc(l.parcela||"")}" placeholder="Opcional">`)}</div>
+    ${fld("Hectáreas",`<input type="number" inputmode="decimal" id="le-ha" value="${l.ha??""}">`)}
     <div class="row2">${fld("Tipo de pastura",`<input type="text" id="le-pastura" list="dl-pasturas" value="${esc(l.pastura||"")}" placeholder="Elegí o escribí"><datalist id="dl-pasturas">${PASTURAS.map(x=>`<option value="${x}">`).join("")}</datalist>`)}${fld("Carga posible (cab/ha)",`<input type="number" inputmode="decimal" id="le-cargamax" value="${l.cargaMax??""}">`)}</div>
     ${fld("Aguadas",`<input type="text" id="le-aguadas" value="${esc(l.aguadas||"")}" placeholder="Ej. molino y 2 bebederos">`)}
     <div class="row2">${fld("Fecha de entrada",`<input type="date" id="le-ingreso" value="${l.ingreso||""}">`)}${fld("Salida prevista",`<input type="date" id="le-salida" value="${l.salida||""}">`)}</div>
@@ -1217,7 +1227,7 @@ function guardarLote(){
   const E=estab(); E.lotes=E.lotes||[];
   if(E.lotes.some(x=>x.id!==l.id&&!x.borrado&&norm(x.nombre)===norm(n))){ toast("Ya hay un lote con ese nombre"); return; }
   const comp={}; catsE(E).forEach(c=>{ const v=num($("#le-c-"+c.id).value); if(v) comp[c.id]=v; });
-  const r={id:l.id,nombre:n,potrero:$("#le-potrero").value.trim(),ha:num($("#le-ha").value),pastura:$("#le-pastura").value.trim(),cargaMax:num($("#le-cargamax").value),aguadas:$("#le-aguadas").value.trim(),ingreso:$("#le-ingreso").value,salida:$("#le-salida").value,comp,obs:$("#le-obs").value.trim()};
+  const r={id:l.id,nombre:n,potrero:$("#le-potrero").value.trim(),parcela:$("#le-parcela").value.trim(),ha:num($("#le-ha").value),pastura:$("#le-pastura").value.trim(),cargaMax:num($("#le-cargamax").value),aguadas:$("#le-aguadas").value.trim(),ingreso:$("#le-ingreso").value,salida:$("#le-salida").value,comp,obs:$("#le-obs").value.trim()};
   const i=E.lotes.findIndex(x=>x.id===l.id); if(i>=0) E.lotes[i]=r; else E.lotes.push(r);
   saveEstab(E); S.loteEd=null; persist(); toast("Lote guardado"); render();
 }
@@ -1325,7 +1335,7 @@ document.addEventListener("click", e=>{
     if(k==="campSel"||k==="calYear"){ S[k]=Number(v); render(); return; }
     if(k==="impAccion"){ S.imp.accion=v; render(); return; }
     const f=S.f; if(!f) return;
-    if(k==="loteSel"){ const l=loteById(v); if(l){ const same=f.loteId===v; f.loteId=same?"":v; f.lote=same?"":l.nombre; if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+    if(k==="loteSel"){ const l=loteById(v); if(l){ const same=f.loteId===v; f.loteId=same?"":v; f.lote=same?"":l.nombre; if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela") f.parcela=u.parcela; } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
     f[k] = (f[k]===v && !["sexo","estado","madreTipo","animalTipo","terneroTipo","categoria","resultado","valor","movimiento","mov"].includes(k)) ? "" : v;
     if(k==="resultado"&&f.tipo==="tacto"&&!S.editId){ guardarTactoCola(); return; }
     const y=window.scrollY; render(); window.scrollTo(0,y);
@@ -1392,7 +1402,7 @@ function guardarAjustes(){
   S.set.estab=v;
   S.filt=null; S.why=null; persist(); toast("Ajustes guardados"); render(); sync();
 }
-const LE_CAMPOS={"le-nombre":"nombre","le-potrero":"potrero","le-ha":"ha","le-pastura":"pastura","le-cargamax":"cargaMax","le-aguadas":"aguadas","le-ingreso":"ingreso","le-salida":"salida","le-obs":"obs"};
+const LE_CAMPOS={"le-nombre":"nombre","le-potrero":"potrero","le-parcela":"parcela","le-ha":"ha","le-pastura":"pastura","le-cargamax":"cargaMax","le-aguadas":"aguadas","le-ingreso":"ingreso","le-salida":"salida","le-obs":"obs"};
 function anotarLote(t){
   if(!S.loteEd || !t.id || !t.id.startsWith("le-")) return false;
   if(t.id.startsWith("le-c-")){ S.loteEd.comp=S.loteEd.comp||{}; S.loteEd.comp[t.id.slice(5)]=t.value; }
