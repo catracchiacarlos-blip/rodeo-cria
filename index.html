@@ -574,7 +574,7 @@ function entoreCamp(c){
 function formSanidad(f){
   const E=estab(), tareas=E.plan;
   return `<h1>Sanidad / tarea del plan</h1>
-  ${fld("Tarea del plan", `<select data-f="tarea"><option value="">Elegir…</option>${["Reproductivo","Vacas","Vaquillonas","Terneros","Toros","Desparasitación","Diagnóstico"].map(g=>`<optgroup label="${g}">${tareas.filter(t=>t.grupo===g).map(t=>`<option value="${t.id}" ${f.tarea===t.id?"selected":""}>${esc(t.nombre)}</option>`).join("")}</optgroup>`).join("")}<option value="otra" ${f.tarea==="otra"?"selected":""}>Otra (fuera del plan)</option></select>`)}
+  ${fld("Tarea del plan", `<select data-f="tarea"><option value="">Elegir…</option>${["Reproductivo","Vacas","Vaquillonas","Terneros","Toros","Desparasitación","Diagnóstico"].map(g=>`<optgroup label="${g}">${tareas.filter(t=>t.grupo===g).map(t=>`<option value="${t.id}" ${f.tarea===t.id?"selected":""}>${esc(tareaNom(t))}</option>`).join("")}</optgroup>`).join("")}<option value="otra" ${f.tarea==="otra"?"selected":""}>Otra (fuera del plan)</option></select>`)}
   ${fld("Producto / dosis", inp("producto",f.producto,{ph:"Ej. vacuna reproductiva, 5 ml"}))}
   ${lotesE().length?lotePick(f):""}
   <div class="row2">${fld("Animales", inp("cantidad",f.cantidad,{type:"number",mode:"numeric"}), f.loteId?"Al elegir el lote se completa con sus cabezas.":"")}${lotesE().length?"":fld("Lote / rodeo", inp("lote",f.lote,{ph:"Opcional"}))}</div>
@@ -1154,32 +1154,61 @@ function compararCamp(cs){
 }
 
 /* ----- calendario de procesos ----- */
-function hechoEn(tid,y,m){
+/* tareas del plan por rodeo: "vacas", "vaquillonas" o un lote ("l:<id>"); vacío = todo el rodeo */
+const rodeoNom = r => !r ? "" : r==="vacas" ? "Vacas" : r==="vaquillonas" ? "Vaquillonas" : r.startsWith("l:") ? ((lotesE().find(l=>l.id===r.slice(2))||{}).nombre||"lote quitado") : r;
+const tareaNom = t => t.nombre + (t.rodeo ? " · "+rodeoNom(t.rodeo) : "");
+const tareaBase = t => t.base || t.id;
+function rodeoDeEvento(e){
+  const c=norm(e.categoria||""); if(c.includes("vaquill")) return "vaquillonas"; if(c==="vaca"||c.startsWith("vaca")) return "vacas";
+  const l=lotesE().find(x=>matchLote(e,x)); if(!l) return "";
+  const vq=sumCats(l,x=>norm(x.nombre).includes("vaquill")), vc=sumCats(l,x=>norm(x.nombre).includes("vaca")&&!norm(x.nombre).includes("vaquill"));
+  return vq>vc ? "vaquillonas" : vc ? "vacas" : "";
+}
+function eventoEnRodeo(e,r){
+  if(!r) return true;
+  if(r.startsWith("l:")){ const l=lotesE().find(x=>x.id===r.slice(2)); return !!l && matchLote(e,l); }
+  const er=rodeoDeEvento(e); return !er || er===r;   // sin dato de rodeo: cuenta para los dos
+}
+function hechoEn(t,y,m){
+  const tid=t.id, b=tareaBase(t);
   return eventos().some(e=>{ const fy=Number((e.fecha||"").slice(0,4)), fm=Number((e.fecha||"").slice(5,7)); if(fy!==y||fm!==m) return false;
     if(e.tipo==="sanidad") return e.tarea===tid;
-    return (tid==="paricion"&&e.tipo==="parto")||(tid==="tacto"&&e.tipo==="tacto")||(tid==="destete"&&e.tipo==="destete")||(tid==="x-raspaje"&&e.tipo==="toro"); });
+    const auto=(b==="paricion"&&e.tipo==="parto")||(b==="tacto"&&e.tipo==="tacto")||(b==="destete"&&e.tipo==="destete")||(b==="entore"&&e.tipo==="entore")||(b==="x-raspaje"&&e.tipo==="toro");
+    return auto && eventoEnRodeo(e,t.rodeo); });
+}
+/* una sola vez por establecimiento: Entore, Parición, Destete y Tacto separados en vacas y vaquillonas */
+function separarReproductivo(E){
+  if(E.planRodeos) return false;
+  const out=[]; (E.plan||[]).forEach(t=>{
+    if(t.grupo==="Reproductivo" && !t.rodeo && ["entore","paricion","destete","tacto"].includes(t.id)){
+      out.push({...t, rodeo:"vacas"});
+      if(!(E.plan||[]).some(x=>x.id===t.id+"-vaq")) out.push({id:t.id+"-vaq", base:t.id, grupo:"Reproductivo", nombre:t.nombre, rodeo:"vaquillonas", meses:JSON.parse(JSON.stringify(t.meses||{}))});
+    } else out.push(t);
+  });
+  E.plan=out; E.planRodeos=1; return true;
 }
 function renderCalendario(){
+  { const E0=estab(); if(separarReproductivo(E0)) saveEstab(E0); }
   const E=estab(), y=S.calYear, now=new Date(), curY=now.getFullYear(), curM=now.getMonth()+1;
   let plan=0, hecho=0, atras=0; const pend=[];
   const filas=E.plan.map(t=>{
     const cells=[]; for(let m=1;m<=12;m++){
-      const p=Object.prototype.hasOwnProperty.call(t.meses,m), h=hechoEn(t.id,y,m);
+      const p=Object.prototype.hasOwnProperty.call(t.meses,m), h=hechoEn(t,y,m);
       const pasado = y<curY || (y===curY && m<curM);
       let cls="", tx=p?(t.meses[m]||"•"):"";
       if(p){ if(pasado||(y===curY&&m===curM)){ plan++; if(h) hecho++; } if(h) cls="done"; else if(pasado){ cls="late"; atras++; } else cls="plan"; if(!h && y===curY && (m===curM||m===curM+1)) pend.push([t,m,0]); if(!h&&pasado&&y===curY&&m>=curM-3) pend.push([t,m,1]); }
       else if(h){ cls="extra"; tx="✓"; }
-      cells.push(`<td>${cls?`<button class="cell ${cls}" data-cal="${t.id}|${m}" title="${esc(t.nombre)} · ${MESES[m-1]}">${esc(tx)}</button>`:""}</td>`);
+      cells.push(`<td>${cls?`<button class="cell ${cls}" data-cal="${t.id}|${m}" title="${esc(tareaNom(t))} · ${MESES[m-1]}">${esc(tx)}</button>`:""}</td>`);
     }
     return [t, cells.join("")];
   });
   let lastG="";
-  const rows=filas.map(([t,c])=>{ const g=t.grupo!==lastG?`<tr><td colspan="13" style="background:#EEF2F1;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em">${esc(t.grupo)}</td></tr>`:""; lastG=t.grupo; return g+`<tr><td>${esc(t.nombre)}</td>${c}</tr>`; }).join("");
+  const rows=filas.map(([t,c])=>{ const g=t.grupo!==lastG?`<tr><td colspan="13" style="background:#EEF2F1;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em">${esc(t.grupo)}</td></tr>`:""; lastG=t.grupo; return g+`<tr><td>${esc(tareaNom(t))}</td>${c}</tr>`; }).join("");
   const cumpl=pct(hecho,plan);
   return `<h1>Calendario de procesos</h1>
   <div class="field">${seg("calYear",[curY-1,curY,curY+1].map(v=>[v,v]),y)}</div>
   <div class="kpis"><div class="kpi ${sem(cumpl,90)}"><span>Cumplimiento a la fecha</span><b>${f0(cumpl)}${cumpl==null?"":"%"}</b><small>${hecho} de ${plan} tareas</small></div><div class="kpi ${atras?"bad":"ok"}"><span>Atrasadas</span><b>${atras}</b><small>sin registrar</small></div></div>
-  ${pend.length&&y===curY?`<div class="card"><h3 style="margin-top:0">Para hacer o registrar</h3><div class="list">${pend.sort((a,b)=>b[2]-a[2]||a[1]-b[1]).slice(0,14).map(([t,m])=>`<div class="item"><span class="grow"><b>${esc(t.nombre)}</b><span class="small muted">${esc(t.grupo)} · ${MESES_L[m-1]}${t.meses[m]?" · "+t.meses[m]+" dosis":""}</span></span><button class="chip ${m<curM?"bad":"plan"}" data-cal="${t.id}|${m}">Registrar</button></div>`).join("")}</div></div>`:""}
+  ${pend.length&&y===curY?`<div class="card"><h3 style="margin-top:0">Para hacer o registrar</h3><div class="list">${pend.sort((a,b)=>b[2]-a[2]||a[1]-b[1]).slice(0,14).map(([t,m])=>`<div class="item"><span class="grow"><b>${esc(tareaNom(t))}</b><span class="small muted">${esc(t.grupo)} · ${MESES_L[m-1]}${t.meses[m]?" · "+t.meses[m]+" dosis":""}</span></span><button class="chip ${m<curM?"bad":"plan"}" data-cal="${t.id}|${m}">Registrar</button></div>`).join("")}</div></div>`:""}
   <div class="card scroll"><table class="cal"><thead><tr><th>Tarea</th>${MESES.map(m=>`<th>${m}</th>`).join("")}</tr></thead><tbody>
     <tr><td>Oferta de pasto</td>${PASTO.oferta.map(v=>`<td><span style="display:block;height:${v*6}px;background:#97BC62;border-radius:3px;margin:auto;width:70%"></span></td>`).join("")}</tr>
     <tr><td>Requerimientos</td>${PASTO.req.map(v=>`<td><span style="display:block;height:${v*6}px;background:#C98A00;border-radius:3px;margin:auto;width:70%"></span></td>`).join("")}</tr>
@@ -1187,9 +1216,12 @@ function renderCalendario(){
   <div class="chips" style="margin-bottom:12px"><span class="chip plan">Planificado</span><span class="chip ok">Hecho</span><span class="chip bad">Atrasado</span></div>
   <details><summary>Editar el plan de este establecimiento</summary>${editorPlan(E)}</details>`;
 }
+const rodeoOpts = sel => [["","Todo el rodeo"],["vacas","Vacas"],["vaquillonas","Vaquillonas"],...lotesE().map(l=>["l:"+l.id,"Lote "+l.nombre])].map(([v,n])=>`<option value="${v}" ${(sel||"")===v?"selected":""}>${esc(n)}</option>`).join("");
 function editorPlan(E){
-  return `<div class="card scroll"><table class="cal"><thead><tr><th>Tarea</th>${MESES.map(m=>`<th>${m}</th>`).join("")}<th></th></tr></thead><tbody>${E.plan.map((t,i)=>`<tr><td>${esc(t.grupo)} · ${esc(t.nombre)}</td>${MESES.map((_,j)=>`<td><input type="checkbox" data-plan="${i}|${j+1}" ${Object.prototype.hasOwnProperty.call(t.meses,j+1)?"checked":""} style="width:22px;height:22px"></td>`).join("")}<td><button class="chip bad" data-plandel="${i}">✕</button></td></tr>`).join("")}</tbody></table></div>
+  return `<div class="card scroll"><table class="cal"><thead><tr><th>Tarea</th>${MESES.map(m=>`<th>${m}</th>`).join("")}<th></th></tr></thead><tbody>${E.plan.map((t,i)=>`<tr><td>${esc(t.grupo)} · ${esc(t.nombre)}<br><select data-planrodeo="${i}" style="min-height:32px;padding:2px 6px;font-size:13px;margin-top:4px">${rodeoOpts(t.rodeo)}</select></td>${MESES.map((_,j)=>`<td><input type="checkbox" data-plan="${i}|${j+1}" ${Object.prototype.hasOwnProperty.call(t.meses,j+1)?"checked":""} style="width:22px;height:22px"></td>`).join("")}<td><button class="chip" data-plandup="${i}" title="Duplicar para otro rodeo o lote">⧉</button> <button class="chip bad" data-plandel="${i}">✕</button></td></tr>`).join("")}</tbody></table></div>
   <div class="row2">${fld("Grupo",`<select id="np-g">${["Reproductivo","Vacas","Vaquillonas","Terneros","Toros","Desparasitación","Diagnóstico"].map(g=>`<option>${g}</option>`).join("")}</select>`)}${fld("Nueva tarea",`<input type="text" id="np-n" placeholder="Ej. Vitamina A, D, E">`)}</div>
+  ${fld("Rodeo o lote",`<select id="np-r">${rodeoOpts("")}</select>`)}
+  <p class="small muted">Cada tarea puede ser de todo el rodeo, de vacas, de vaquillonas o de un lote. Con ⧉ duplicás una tarea para cargarla en otro rodeo o lote.</p>
   <button class="btn" data-planadd="1">Agregar tarea</button>`;
 }
 
@@ -1223,7 +1255,7 @@ function renderImport(){
   const I=S.imp, conPeso=I.rows.filter(r=>r.peso!=null).length;
   return `<div style="margin-top:12px"><p><b>${I.rows.length} caravanas leídas</b>${conPeso?` · ${conPeso} con peso`:""}</p>
     ${fld("Qué hacer con esta lectura", seg("impAccion",[["sanidad","Sanidad / vacuna"],["pesada","Pesada"],["destete","Destete"],["tacto","Tacto"]],I.accion,"g2"))}
-    ${I.accion==="sanidad"?fld("Tarea del plan",`<select id="imp-tarea">${estab().plan.map(t=>`<option value="${t.id}">${esc(t.grupo)} · ${esc(t.nombre)}</option>`).join("")}</select>`)+fld("Producto",`<input type="text" id="imp-prod">`):""}
+    ${I.accion==="sanidad"?fld("Tarea del plan",`<select id="imp-tarea">${estab().plan.map(t=>`<option value="${t.id}">${esc(t.grupo)} · ${esc(tareaNom(t))}</option>`).join("")}</select>`)+fld("Producto",`<input type="text" id="imp-prod">`):""}
     <div class="row2">${fld("Fecha",`<input type="date" id="imp-fecha" value="${todayStr()}">`)}${fld("Lote",`<input type="text" id="imp-lote">`)}</div>
     <button class="btn solid block" data-impok="1">Cargar</button></div>`;
 }
@@ -1492,8 +1524,10 @@ if(f.tipo==="entore"){ auto("vientres", same?"":(vientresLote(l)||cabLote(l))); 
   if(d.csv){ csv(filtrar(S.filt)); return; }
   if(d.ft){ const T=S.filt.tipos; const i=T.indexOf(d.ft); i>=0?T.splice(i,1):T.push(d.ft); S.why=null; render(); return; }
   if(d.ask){ preguntar(); return; }
-  if(d.cal){ const [tid,m]=d.cal.split("|"); const y=S.calYear; const fecha = (y===new Date().getFullYear()&&Number(m)===new Date().getMonth()+1) ? nowLocal() : `${y}-${pad(m)}-15T12:00`; S.tab="manga"; nuevo("sanidad",{tarea:tid,fecha}); return; }
-  if(d.planadd){ const E=estab(); const n=$("#np-n").value.trim(); if(!n) return; E.plan.push({id:"u-"+uid(),grupo:$("#np-g").value,nombre:n,meses:{}}); saveEstab(E); render(); return; }
+  if(d.cal){ const [tid,m]=d.cal.split("|"); const y=S.calYear; const fecha = (y===new Date().getFullYear()&&Number(m)===new Date().getMonth()+1) ? nowLocal() : `${y}-${pad(m)}-15T12:00`; S.tab="manga"; const tk=estab().plan.find(x=>x.id===tid), lr=tk&&tk.rodeo&&tk.rodeo.startsWith("l:")?loteById(tk.rodeo.slice(2)):null;
+    nuevo("sanidad",{tarea:tid,fecha,...(lr?{loteId:lr.id,lote:lr.nombre,cantidad:cabLote(lr)?String(cabLote(lr)):"",_auto:{cantidad:cabLote(lr)?String(cabLote(lr)):""}}:{})}); return; }
+  if(d.planadd){ const E=estab(); const n=$("#np-n").value.trim(); if(!n) return; const r=$("#np-r").value; E.plan.push({id:"u-"+uid(),grupo:$("#np-g").value,nombre:n,meses:{},...(r?{rodeo:r}:{})}); saveEstab(E); render(); return; }
+  if(d.plandup){ const E=estab(), i=Number(d.plandup), t=E.plan[i]; if(!t) return; const c=JSON.parse(JSON.stringify(t)); c.id="u-"+uid(); c.base=tareaBase(t); c.rodeo=t.rodeo==="vacas"?"vaquillonas":t.rodeo==="vaquillonas"?"vacas":""; E.plan.splice(i+1,0,c); saveEstab(E); toast("Tarea duplicada: elegí su rodeo o lote"); const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(d.plandel){ if(!armar(b,"¿Quitar?")) return; const E=estab(); E.plan.splice(Number(d.plandel),1); saveEstab(E); render(); return; }
   if(d.impok){ aplicarImport(); return; }
   if(d.copyx){ S.copyTxt=null; render(); return; }
@@ -1568,6 +1602,7 @@ document.addEventListener("change", e=>{
   if(d.lper){ S.loteP[d.lper]=t.value; render(); return; }
   if(d.estf){ const E=estab(); E[d.estf]=num(t.value); saveEstab(E); render(); return; }
   if(d.meta){ const E=estab(); E.metas=E.metas||{}; const v=num(t.value); if(v==null) delete E.metas[d.meta]; else E.metas[d.meta]=v; saveEstab(E); S.metasAbiertas=true; const y=window.scrollY; render(); window.scrollTo(0,y); toast("Meta guardada"); return; }
+  if(d.planrodeo){ const E=estab(), tk=E.plan[Number(d.planrodeo)]; if(tk){ if(t.value) tk.rodeo=t.value; else delete tk.rodeo; saveEstab(E); const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
   if(d.plan){ const [i,m]=d.plan.split("|").map(Number); const E=estab(); const tk=E.plan[i]; if(t.checked) tk.meses[m]=""; else delete tk.meses[m]; saveEstab(E); return; }
   if(d.vinc){ const r=S.R[d.vinc]; const v=t.value.trim(); if(!r||!v) return; r.provisorio=r.animal; r.animal=normId(v); r.ident=esEID(v)?"eid":"visual"; put(r); toast("Ternero vinculado a "+fmtEID(r.animal)); render(); return; }
   if(t.id==="imp-file"&&t.files[0]){ const rd=new FileReader(); rd.onload=()=>{ const rows=parseBaston(String(rd.result)); if(!rows.length){ toast("No encontré caravanas de 15 dígitos en el archivo"); return; } S.imp={rows, accion: rows.some(r=>r.peso!=null)?"pesada":"sanidad"}; render(); }; rd.readAsText(t.files[0]); return; }
