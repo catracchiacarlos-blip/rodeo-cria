@@ -9,6 +9,21 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script>
+// iPhone: la app instalada no comparte datos con Safari, así que tiene que arrancar con el mismo
+// link (código y establecimiento) con el que se instaló.
+(function(){
+  try{
+    var ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    if(!ios||!location.search) return;
+    var base=location.href.split("?")[0].replace(/index\.html$/,"");
+    var m={name:"Rodeo de cría · APSAVET",short_name:"Rodeo de cría",start_url:base+location.search,scope:base,display:"standalone",
+      background_color:"#F3F6F4",theme_color:"#0B3133",lang:"es-AR",
+      icons:[{src:base+"icon-192.png",sizes:"192x192",type:"image/png"},{src:base+"icon-512.png",sizes:"512x512",type:"image/png"}]};
+    document.querySelector('link[rel="manifest"]').href="data:application/manifest+json,"+encodeURIComponent(JSON.stringify(m));
+  }catch(_){}
+})();
+</script>
 <title>Rodeo de cría · APSAVET</title>
 <style>
 :root{
@@ -669,7 +684,33 @@ function banners(){
   let h="";
   if(!S.set.api) h+=`<div class="banner"><b>Sin servidor configurado.</b> Lo que cargues queda guardado en este celular. Configuralo en Oficina → Ajustes.</div>`;
   else if(S.syncState==="err") h+=`<div class="banner"><b>No se pudo subir.</b> ${esc(S.syncErr)}. Los datos siguen guardados en el celular.</div>`;
-  return h;
+  return h + bannerInstalar();
+}
+/* ----- instalar en el celular ----- */
+const INST = { evento:null, oculto:false };
+try{ INST.oculto = localStorage.getItem("rc-inst-no")==="1"; }catch(_){}
+const instalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone===true;
+const esIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+const navInterno = () => /WhatsApp|FBAN|FBAV|Instagram|Line\/|wv\)/i.test(navigator.userAgent);
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); INST.evento=e; if(S.view!=="setup") render(); });
+window.addEventListener("appinstalled", () => { INST.evento=null; toast("App instalada. Ya abre sin señal."); render(); });
+function textoInstalar(){
+  if(instalada()) return `<b>La app ya está instalada en este celular.</b> Abre sin señal y lo que cargues se sube solo cuando vuelve la conexión.`;
+  if(navInterno()) return `<b>Para instalarla, abrí este link en ${esIOS()?"Safari":"Chrome"}.</b> Desde WhatsApp tocá los tres puntos (o el ícono de compartir) → "Abrir en el navegador".`;
+  if(INST.evento) return `<b>Instalá la app en el celular</b> para abrirla con un ícono y sin señal.`;
+  if(esIOS()) return `<b>Instalá la app en el iPhone:</b> en Safari tocá <b>Compartir</b> (el cuadrado con la flecha) → <b>"Agregar a inicio"</b>. Hacelo antes de empezar a cargar: la app instalada no ve lo cargado en Safari que no se haya subido.`;
+  return `<b>Instalá la app en el celular:</b> en Chrome tocá el menú ⋮ → <b>"Instalar aplicación"</b> o <b>"Agregar a pantalla principal"</b>.`;
+}
+function bannerInstalar(){
+  if(instalada() || INST.oculto) return "";
+  return `<div class="card" style="border:2px solid var(--acc)"><p style="margin:0 0 10px">${textoInstalar()}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${INST.evento?`<button class="btn solid" data-instalar="1">Instalar</button>`:""}<button class="btn" data-instno="1">Ahora no</button></div></div>`;
+}
+async function instalar(){
+  if(!INST.evento) return;
+  INST.evento.prompt();
+  try{ await INST.evento.userChoice; }catch(_){}
+  INST.evento=null; render();
 }
 function rowEv(e){
   const t=TIPOS[e.tipo]?.n||e.tipo;
@@ -1131,7 +1172,7 @@ function renderAjustes(){
     <button class="btn solid block" data-ajok="1" style="margin-top:12px">Guardar ajustes</button></div>
   <div class="card"><h3 style="margin-top:0">Metas de ${esc(E.nombre)}</h3>
     <div class="row2">${[["prenez","Preñez %"],["cabeza","Preñez cabeza %"],["mortPeri","Mortandad perinatal %"],["mortDest","Mortandad parto-destete %"],["destete","Destete %"],["kgVaca","Kg destetados / vaca"],["torosMin","Toros mín. %"],["torosMax","Toros máx. %"]].map(([k,l])=>fld(l,`<input type="number" inputmode="decimal" data-meta="${k}" value="${M[k]??""}">`)).join("")}</div></div>
-  <div class="card"><h3 style="margin-top:0">Instalar en el celular</h3><p class="small" style="margin:0">Android (Chrome): menú ⋮ → "Instalar aplicación" o "Agregar a pantalla principal". iPhone (Safari): Compartir → "Agregar a inicio". Una vez instalada funciona sin señal.</p></div>
+  <div class="card"><h3 style="margin-top:0">Instalar en el celular</h3><p class="small" style="margin:0 0 8px">${textoInstalar()}</p>${INST.evento&&!instalada()?`<button class="btn solid block" data-instalar="1">Instalar</button>`:""}</div>
   <p class="small muted">Registros en este celular: ${eventos().length} · sin subir: ${Object.keys(S.outbox).length}${S.lastSync?` · última sincronización: ${new Date(S.lastSync).toLocaleString("es-AR")}`:""}</p>`;
 }
 function renderSetup(){
@@ -1154,6 +1195,7 @@ function render(){
   const app=$("#app");
   app.innerHTML = (S.copyTxt?`<div class="card"><h3 style="margin-top:0">Copiá este texto</h3><textarea readonly style="min-height:160px">${esc(S.copyTxt)}</textarea><button class="btn block" data-copyx="1" style="margin-top:8px">Cerrar</button></div>`:"") + (S.view==="setup"?renderSetup(): S.view==="form"?(abierta(S.tab)?renderForm():renderLock()): renderHome());
   renderSavebar(); renderSync();
+  if(S.versionNueva && S.view!=="form"){ S.versionNueva=false; aplicarVersion(); }
 }
 
 /* ====================== eventos ====================== */
@@ -1163,6 +1205,8 @@ document.addEventListener("click", e=>{
   if(d.tab){ S.tab=d.tab; S.view="home"; S.f=null; render(); window.scrollTo(0,0); return; }
   if(b.id==="btn-sync"){ sync(); toast(Object.keys(S.outbox).length?"Subiendo datos…":"Buscando novedades…"); return; }
   if(d.new){ nuevo(d.new); return; }
+  if(d.instalar){ instalar(); return; }
+  if(d.instno){ INST.oculto=true; try{ localStorage.setItem("rc-inst-no","1"); }catch(_){} toast("Lo podés instalar después desde Oficina → Ajustes"); render(); return; }
   if(d.back){ S.f=null; S.editId=null; S.view="home"; render(); return; }
   if(d.save){ guardar(); return; }
   if(d.edit){ editar(d.edit); return; }
@@ -1298,7 +1342,22 @@ async function init(){
   if(qs.get("demo")) demo();
   S.view = S.set.operario ? "home" : "setup";
   persist(); render(); sync();
-  if("serviceWorker" in navigator && location.protocol.startsWith("http")){ try{ navigator.serviceWorker.register("sw.js"); }catch(_){} }
+  if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+    try{
+      const habia = !!navigator.serviceWorker.controller;
+      const reg = await navigator.serviceWorker.register("sw.js");
+      // versión nueva bajada con señal → se aplica sola (si está cargando algo, al terminar)
+      navigator.serviceWorker.addEventListener("message", e=>{ if(e.data&&e.data.tipo==="nueva-version") aplicarVersion(); });
+      navigator.serviceWorker.addEventListener("controllerchange", ()=>{ if(habia) aplicarVersion(); });
+      const buscar = ()=>{ if(navigator.onLine){ reg.update().catch(()=>{}); fetch("./",{cache:"no-store"}).catch(()=>{}); } };
+      window.addEventListener("online", buscar);
+      document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") buscar(); });
+    }catch(_){}
+  }
+}
+function aplicarVersion(){
+  if(S.view==="form"){ S.versionNueva=true; return; }   // no cortar una carga a medias
+  persist(); setTimeout(()=>location.reload(), 1200);
 }
 function demo(){
   if(eventos().length) return;
