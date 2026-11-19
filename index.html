@@ -417,6 +417,7 @@ async function sync(){
       chunk.forEach(id=>{ const x=S.R[id]; if(x && x.clase==="config") S.base[id]=JSON.parse(JSON.stringify(x)); if(x && x.actualizadoLocal===vers[id]) delete S.outbox[id]; });
     }
     S.syncState="ok"; S.syncErr=""; S.codMal=false;
+    registrarUsuario();
     persist();
     if(!S.f && S.view!=="setup") renderSiSePuede();
   }catch(e){
@@ -651,8 +652,8 @@ function serieResumen(t){
 
 /* ----- guardar ----- */
 function construir(f){
-  const r={clase:"evento", id:S.editId||uid(), estab:S.set.estab, tipo:f.tipo, fecha:f.fecha||nowLocal(), operario:S.set.operario, potrero:(f.potrero||"").trim(), lote:(f.lote||"").trim(), loteId:f.loteId||"", obs:(f.obs||"").trim(), lat:f.lat||"", lng:f.lng||""};
-  if(S.editId){ const o=S.R[S.editId]; r.operario=o.operario; r.creado=o.creado; }
+  const r={clase:"evento", id:S.editId||uid(), estab:S.set.estab, tipo:f.tipo, fecha:f.fecha||nowLocal(), operario:S.set.operario, usuario:S.set.usrId||"", potrero:(f.potrero||"").trim(), lote:(f.lote||"").trim(), loteId:f.loteId||"", obs:(f.obs||"").trim(), lat:f.lat||"", lng:f.lng||""};
+  if(S.editId){ const o=S.R[S.editId]; r.operario=o.operario; r.usuario=o.usuario||""; r.creado=o.creado; }
   if(f.tipo==="parto"){
     const m=identOf(f,"madre"); r.madre=m.id; r.madreIdent=m.ident; r.madreSena=m.sena;
     if(f.terneroTipo==="prov"){ r.animal=(S.editId&&S.R[S.editId].ident==="prov")?S.R[S.editId].animal:provisional(); r.ident="prov"; }
@@ -771,6 +772,41 @@ function pedirHoja(h, luego){
   S.lockH={s,h,luego}; render(); window.scrollTo(0,0); return false;
 }
 const esCompu = () => matchMedia("(pointer: fine)").matches && innerWidth>=900;
+
+/* ----- usuarios: cada celular que entra con el código de un campo queda registrado (nombre, celular) y se puede desactivar ----- */
+const usrId = () => S.set.usrId ? "usr-"+S.set.estab+"-"+S.set.usrId : "";
+const usrRec = () => S.R[usrId()]||null;
+const usrBloqueado = () => S.set.rol==="campo" && !!usrRec() && usrRec().activo===false && !usrRec().borrado;
+const equipoTxt = () => esCompu()?"Computadora":esIOS()?"iPhone":"Celular";
+function registrarUsuario(){
+  if(S.set.rol!=="campo" || !S.set.estab || !S.set.usrId || necesitaConexion()) return;
+  const r=usrRec(), hoy=todayStr(), nombre=S.set.operario||"", celular=S.set.celular||"";
+  if(!r){ put({clase:"config",tipo:"usuario",id:usrId(),estab:S.set.estab,nombre,celular,equipo:equipoTxt(),alta:nowLocal(),ultima:hoy,activo:true}); return; }
+  if(r.borrado) return;
+  if(r.nombre!==nombre || (r.celular||"")!==celular || r.ultima!==hoy) put({...r,nombre,celular,ultima:hoy});
+}
+const usuariosE = (id=S.set.estab) => Object.values(S.R).filter(r=>r.tipo==="usuario" && !r.borrado && r.estab===id)
+  .sort((a,b)=>(a.activo===false)-(b.activo===false) || String(a.nombre).localeCompare(String(b.nombre),"es"));
+function renderUsuarios(){
+  const E=estab(), U=usuariosE(), act=U.filter(u=>u.activo!==false).length;
+  return `<div class="card"><h3 style="margin-top:0">Usuarios de ${esc(E.nombre)}</h3>
+    <p class="small muted" style="margin-top:0">Cada celular o compu que entra con el código de este campo queda anotado acá con el nombre y el celular que puso. Si desactivás a alguien, la próxima vez que su app se conecte queda bloqueada (lo que ya cargó se sube igual). Activos: <b>${act}</b> de ${U.length}.</p>
+    <div class="list">${U.map(u=>{ const on=u.activo!==false;
+      return `<div class="kblock" style="margin:6px 0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b class="grow">${esc(u.nombre||"Sin nombre")}</b><span class="chip ${on?"ok":""}">${on?"Activo":"Desactivado"}</span>${S.outbox[u.id]?`<span class="chip">sin subir</span>`:""}</div>
+        <div class="small muted" style="margin:4px 0">${u.celular?"Cel. "+esc(u.celular)+" · ":""}${esc(u.equipo||"")}${u.alta?" · alta "+fmtD(u.alta.slice(0,10)):""}${u.ultima?" · última conexión "+fmtD(u.ultima):""}</div>
+        <button class="btn ${on?"":"solid"}" data-usract="${esc(u.id)}">${on?"Desactivar":"Activar"}</button></div>`; }).join("")||`<p class="muted">Todavía no entró nadie con el código de este campo (o tienen la versión vieja de la app: se anotan solos al actualizarse).</p>`}</div></div>`;
+}
+function usrToggle(b,id){
+  const u=S.R[id]; if(!u) return;
+  const on=u.activo!==false;
+  if(on && !armar(b,"Tocá de nuevo para desactivar")) return;
+  put({...u,activo:!on}); toast(`${u.nombre||"Usuario"}: ${on?"desactivado":"activado"}`); render();
+}
+function renderBloqueado(){
+  return `<div class="card" style="text-align:center;padding:28px 18px"><h2 style="margin-top:0">Usuario desactivado</h2>
+    <p class="muted">${esc(S.set.operario||"Este usuario")}: tu acceso a la app de ${esc(estab().nombre)} está desactivado. Pedile al asesor que te vuelva a activar.${Object.keys(S.outbox).length?" Lo que habías cargado sigue guardado y se sube cuando haya señal.":""}</p>
+    <button class="btn solid" data-reintentar="1">Ya me activaron: reintentar</button></div>`;
+}
 
 /* ====================== pantallas ====================== */
 function renderEsperando(){
@@ -1426,13 +1462,14 @@ function renderAjustes(){
   return `<h1>Ajustes</h1>
   <div class="card">${(esAdmin()||!S.set.rol)?fld("Establecimiento",`<select id="aj-estab">${Object.entries(L).map(([id,n])=>`<option value="${id}" ${id===S.set.estab?"selected":""}>${esc(n)}</option>`).join("")}</select>`):`<p style="margin-top:0">Campo: <b>${esc(E.nombre)}</b></p>`}
     ${fld("Tu nombre (quién carga)",`<input type="text" id="aj-op" value="${esc(S.set.operario)}">`)}
+    ${fld("Tu celular",`<input type="tel" id="aj-cel" value="${esc(S.set.celular||"")}">`)}
     ${fld("Dirección del servidor",`<input type="url" id="aj-api" value="${esc(S.set.api)}" placeholder="https://script.google.com/macros/s/…/exec">`)}
     ${fld("Código de acceso",`<input type="text" id="aj-cod" value="${esc(S.set.codigo)}" autocapitalize="off">`)}
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(127,127,127,.25)"><h3 style="margin-top:0">Claves de acceso de ${esc(E.nombre)}</h3>
       ${editorClaves(E)}
       <button class="btn block" data-lockall="1" style="margin-top:8px">Bloquear este celular</button></div>
     <button class="btn solid block" data-ajok="1" style="margin-top:12px">Guardar ajustes</button></div>
-  ${esAdmin()?renderCampos():""}
+  ${esAdmin()?renderUsuarios()+renderCampos():""}
   ${editorMetas()}
   <div class="card"><h3 style="margin-top:0">Instalar en el celular</h3><p class="small" style="margin:0 0 8px">${textoInstalar()}</p>${INST.evento&&!instalada()?`<button class="btn solid block" data-instalar="1">Instalar</button>`:""}</div>
   <p class="small muted">Registros en este celular: ${eventos().length} · sin subir: ${Object.keys(S.outbox).length}${S.lastSync?` · última sincronización: ${new Date(S.lastSync).toLocaleString("es-AR")}`:""}</p>`;
@@ -1480,6 +1517,7 @@ function renderSetup(){
   return `<h1>Bienvenido</h1><p class="muted">Se configura una sola vez en este celular.</p>
   <div class="card">
     ${fld("Tu nombre",`<input type="text" id="su-op" value="${esc(S.set.operario)}" placeholder="Ej. Juan">`)}
+    ${fld("Tu celular",`<input type="tel" id="su-cel" value="${esc(S.set.celular||"")}" placeholder="Ej. 2478 123456">`,"Para que el asesor sepa quién usa la app.")}
     ${fld("Código de acceso",`<input type="text" id="su-cod" value="${esc(S.set.codigo)}" autocapitalize="off" placeholder="Te lo pasa el asesor">`)}
     <details ${S.set.api?"":"open"}><summary>Servidor</summary>${fld("Dirección del servidor",`<input type="url" id="su-api" value="${esc(S.set.api)}" placeholder="https://script.google.com/macros/s/…/exec">`,"Si llegaste por el link que te mandaron ya viene cargada.")}</details>
     <button class="btn solid block" data-setup="1">Empezar</button>
@@ -1492,9 +1530,9 @@ function render(){
   $("#h-title").textContent = "Rodeo de cría";
   $("#h-sub").textContent = `${E.nombre} · ${S.set.operario||"APSAVET"}`;
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===S.tab&&S.view!=="setup"?"page":"false"));
-  $("#tabs").hidden = S.view==="setup";
+  $("#tabs").hidden = S.view==="setup" || usrBloqueado();
   const app=$("#app");
-  app.innerHTML = (S.copyTxt?`<div class="card"><h3 style="margin-top:0">Copiá este texto</h3><textarea readonly style="min-height:160px">${esc(S.copyTxt)}</textarea><button class="btn block" data-copyx="1" style="margin-top:8px">Cerrar</button></div>`:"") + (S.view==="setup"?renderSetup(): S.lockH?renderLock(S.lockH.s,S.lockH.h): S.view==="form"?(abierta(S.tab)?renderForm():renderLock()): renderHome());
+  app.innerHTML = (S.copyTxt?`<div class="card"><h3 style="margin-top:0">Copiá este texto</h3><textarea readonly style="min-height:160px">${esc(S.copyTxt)}</textarea><button class="btn block" data-copyx="1" style="margin-top:8px">Cerrar</button></div>`:"") + (S.view==="setup"?renderSetup(): usrBloqueado()?renderBloqueado(): S.lockH?renderLock(S.lockH.s,S.lockH.h): S.view==="form"?(abierta(S.tab)?renderForm():renderLock()): renderHome());
   renderSavebar(); renderSync();
   if(S.versionNueva && !ocupado()){ S.versionNueva=false; aplicarVersion(); }
 }
@@ -1510,6 +1548,7 @@ document.addEventListener("click", e=>{
   if(d.codnuevo){ const v=($("#cod-nuevo").value||"").trim().toUpperCase(); if(!v){ toast("Escribí el código"); return; } S.set.codigo=v; S.codMal=false; S.syncState="idle"; persist(); render(); sync(); return; }
   if(d.copylink){ const c=camposAdmin().find(x=>x.codigo===d.copylink); if(c) copiar(`App de rodeo de cría · ${c.nombre}\n${linkCampo(c)}`); return; }
   if(d.nuevocampo){ nuevoCampo(); return; }
+  if(d.usract){ usrToggle(b,d.usract); return; }
   if(d.subirtodo){ if(!armar(b,"Tocá de nuevo para subir todo")) return; Object.keys(S.R).forEach(id=>S.outbox[id]=true); persist(); sync(); toast("Subiendo todo…"); render(); return; }
   if(d.instno){ INST.oculto=true; try{ localStorage.setItem("rc-inst-no","1"); }catch(_){} toast("Lo podés instalar después desde Oficina → Ajustes"); render(); return; }
   if(d.back){ S.f=null; S.editId=null; S.view="home"; render(); return; }
@@ -1568,7 +1607,7 @@ if(f.tipo==="entore"){ auto("vientres", same?"":(vientresLote(l)||cabLote(l))); 
   if(d.lsave){ guardarLote(); return; }
   if(d.ldel){ if(!armar(b,"Tocá de nuevo para quitar")) return; const E=estab(); E.lotes=(E.lotes||[]).filter(x=>x.id!==S.loteEd.id); saveEstab(E); S.loteEd=null; persist(); toast("Lote quitado"); render(); return; }
   if(d.nuevoest && (esAdmin()||!S.set.rol)){ const n=$("#aj-nuevo").value.trim(); if(!n) return; const id=slug(n); S.set.estab=id; if(!estabRec(id)) saveEstab({clase:"config",tipo:"estab",id:"estab-"+id,estab:id,nombre:n,plan:JSON.parse(JSON.stringify(PLAN_BASE)),metas:{...METAS_BASE},campanas:{},potreros:[]}); S.filt=null; persist(); toast("Establecimiento agregado: "+n); render(); return; }
-  if(d.setup){ S.set.operario=$("#su-op").value.trim(); S.set.codigo=$("#su-cod").value.trim(); const a=$("#su-api"); if(a) S.set.api=a.value.trim(); if(!S.set.operario){ toast("Escribí tu nombre"); return; } if(!S.set.estab) S.set.estab=ESTAB_DEFAULT.id; S.view="home"; persist(); render(); sync(); return; }
+  if(d.setup){ S.set.operario=$("#su-op").value.trim(); S.set.celular=($("#su-cel")||{}).value?.trim()||""; S.set.codigo=$("#su-cod").value.trim(); const a=$("#su-api"); if(a) S.set.api=a.value.trim(); if(!S.set.operario){ toast("Escribí tu nombre"); return; } if(!S.set.estab) S.set.estab=ESTAB_DEFAULT.id; S.view="home"; persist(); render(); sync(); return; }
 });
 // confirmación sin ventanas emergentes: el primer toque arma, el segundo confirma
 function armar(b,txt){ if(b.dataset.armed==="1") return true; b.dataset.armed="1"; const o=b.textContent; b.textContent=txt; setTimeout(()=>{ if(b.isConnected){ b.dataset.armed=""; b.textContent=o; } },3000); return false; }
@@ -1595,7 +1634,7 @@ function guardarAjustes(){
   document.querySelectorAll("[data-hclave]").forEach(i=>{ const k=i.dataset.hclave, nv=i.value.trim(); if((Hj[k]||"")!==nv){ if(nv) Hj[k]=nv; else delete Hj[k]; cambio=true; } });
   C.hojas=Hj;
   if(cambio){ E.claves=C; saveEstab(E); const u=S.unl[S.set.estab]=S.unl[S.set.estab]||{}; if(C.oficina) u.oficina=C.oficina; }
-  S.set.operario=$("#aj-op").value.trim(); S.set.api=$("#aj-api").value.trim(); S.set.codigo=$("#aj-cod").value.trim();
+  S.set.operario=$("#aj-op").value.trim(); S.set.celular=($("#aj-cel")||{}).value?.trim()||""; S.set.api=$("#aj-api").value.trim(); S.set.codigo=$("#aj-cod").value.trim();
   S.set.estab=v;
   S.filt=null; S.why=null; persist(); toast("Ajustes guardados"); render(); sync();
 }
@@ -1674,6 +1713,7 @@ async function init(){
   if(qs.get("estab")) S.set.estab=slug(qs.get("estab"));
   if(!S.set.api && API_DEFAULT) S.set.api=API_DEFAULT;
   if(!S.set.estab) S.set.estab=ESTAB_DEFAULT.id;
+  if(!S.set.usrId) S.set.usrId=uid();
   if(qs.get("demo")) demo();
   S.view = S.set.operario ? "home" : "setup";
   persist(); render(); sync();
