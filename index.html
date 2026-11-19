@@ -195,7 +195,7 @@ function editorMetas(){
 
 const TIPOS = {
   parto:{n:"Parto",pl:"Partos"}, muerte:{n:"Muerte",pl:"Muertes"}, novedad:{n:"Novedad",pl:"Novedades"},
-  tacto:{n:"Tacto",pl:"Tactos"}, toro:{n:"Revisación de toro",pl:"Toros revisados"}, cc:{n:"Condición corporal",pl:"Registros de CC"},
+  tacto:{n:"Tacto",pl:"Tactos"}, ia:{n:"Inseminación",pl:"Inseminaciones"}, toro:{n:"Revisación de toro",pl:"Toros revisados"}, cc:{n:"Condición corporal",pl:"Registros de CC"},
   sanidad:{n:"Sanidad / tarea",pl:"Sanidad y tareas"}, destete:{n:"Destete",pl:"Destetes"}, pesada:{n:"Pesada",pl:"Pesadas"},
   lote:{n:"Recorrida de lote",pl:"Recorridas de lote"}, entore:{n:"Entore",pl:"Entores"}, hacienda:{n:"Entrada/salida de hacienda",pl:"Entradas y salidas de hacienda"}, instal:{n:"Bebidas, molino y alambrados",pl:"Controles de instalaciones"}
 };
@@ -352,7 +352,7 @@ function campOf(r){
   if(r.tipo==="tacto") return m<=8 ? y-1 : y;
   if(r.tipo==="destete") return m<=6 ? y-2 : y-1;
   if(r.tipo==="muerte" && r.categoria==="ternero") return m<=6 ? y-2 : y-1;
-  if(r.tipo==="toro"||r.tipo==="entore") return m>=7 ? y : y-1;
+  if(r.tipo==="toro"||r.tipo==="entore"||r.tipo==="ia") return m>=7 ? y : y-1;
   return m>=10 ? y : y-1;
 }
 
@@ -481,7 +481,8 @@ function nuevo(tipo, extra={}){
   if(!pedirHoja(tipo, ()=>nuevo(tipo, extra))) return;
   const f={tipo, fecha:nowLocal(), potrero:S.set.potrero||"", lote:S.set.lote||"", loteId:S.set.loteId||"", madreTipo:"visual", animalTipo:"visual", ...extra};
   if(tipo==="parto"){ f.estado="vivo"; f.dificultad="1"; f.terneroTipo="prov"; }
-  if(tipo==="tacto"||tipo==="cc"||tipo==="destete"||tipo==="pesada"){ S.serie=[]; }
+  if(tipo==="tacto"||tipo==="cc"||tipo==="destete"||tipo==="pesada"||tipo==="ia"){ S.serie=[]; }
+  if(tipo==="ia"){ f.servicio=f.servicio||"iatf"; f.categoria=f.categoria||"vaca"; f.animalTipo=extra.animalTipo||"visual"; }
   if(tipo==="entore"){ f.movimiento="inicio"; f.servicio="natural"; }
   if(tipo==="lote"){ f.movimiento="control"; const l=loteById(f.loteId); if(l){ const u=ubicLote(l); if(u.potrero) f.potrero=u.potrero; if(u.parcela) f.parcela=u.parcela; if(u.haParcela!=null) f.haParcela=String(u.haParcela); } }
   if(tipo==="toro"){ f.aptitud=""; f.tricho="pend"; f.campylo="pend"; f.animalTipo="visual"; }
@@ -625,27 +626,32 @@ function formInstal(f){
 }
 /* ----- manga: carga en serie ----- */
 function formSerie(f){
-  const t=f.tipo, titulo={tacto:"Tacto",cc:"Condición corporal",destete:"Destete",pesada:"Pesada"}[t];
+  const t=f.tipo, titulo={tacto:"Tacto",cc:"Condición corporal",destete:"Destete",pesada:"Pesada",ia:"Inseminación"}[t];
   let res="";
   if(t==="tacto") res=fld("Resultado", seg("resultado",[["cabeza","Cabeza"],["cuerpo","Cuerpo"],["cola","Cola"],["vacia","Vacía","bad"]],f.resultado,"xl"));
   if(t==="cc") res=fld("Condición corporal (1 a 5)", seg("valor",["1","1.5","2","2.5","3","3.5","4","4.5","5"].map(v=>[v,v.replace(".",","),Number(v)<2.5?"bad":""]),f.valor,"xl"));
+  if(t==="ia") res=`<p class="small muted">Leé o escribí la caravana y tocá "Guardar y siguiente" (con el bastón se guarda sola al leer). El toro, el servicio y el inseminador quedan para la siguiente.</p>`;
   if(t==="destete"||t==="pesada") res=`<div class="row2">${fld("Peso (kg)", inp("peso",f.peso,{type:"number",mode:"decimal",cls:"idin",id:"in-peso"}))}${t==="destete"?fld("Sexo", seg("sexo",[["M","M"],["H","H"]],f.sexo)):"<div></div>"}</div>`;
   const cuenta=serieResumen(t);
   return `<h1>${titulo} en manga</h1>
   <div class="card">${lotePick(f)}<div class="row2">${fld("Lote / rodeo", inp("lote",f.lote,{ph:"Ej. vacas 2° servicio"}))}${t==="tacto"||t==="cc"?fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaq."]],f.categoria||"vaca")):fld("Fecha", inp("fecha",f.fecha.slice(0,10),{type:"date"}))}</div>
+  ${t==="ia"?fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaquillona"]],f.categoria||"vaca"))+fld("Servicio", seg("servicio",IA_SERV,f.servicio))+`<div class="row2">${fld("Toro / pajuela", inp("pajuela",f.pajuela,{ph:"Nombre o código del toro"}))}${fld("Inseminador", inp("inseminador",f.inseminador,{ph:"Opcional"}))}</div>`:""}
   ${t==="cc"?fld("Momento", seg("momento",[["servicio","Servicio"],["tacto","Tacto"],["preparto","Preparto"],["destete","Destete"]],f.momento)):""}
   ${t==="pesada"?fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaquillona"],["ternero","Ternero"],["toro","Toro"]],f.categoria)):""}</div>
-  ${idBlock("animal",f,t==="destete"?"Ternero":"Animal",t!=="destete")}
+  ${idBlock("animal",f,t==="destete"?"Ternero":t==="ia"?"Caravana de la vaca":"Animal",t!=="destete"&&t!=="ia")}
   ${res}
   ${t==="tacto"?`<p class="small muted">Al tocar el resultado se guarda y pasa a la siguiente.</p>`:""}
   <div class="card"><h3 style="margin-top:0">Cargados en esta tanda: ${S.serie.length}</h3>${cuenta}
   <div class="serie">${S.serie.slice().reverse().map(id=>{ const r=S.R[id]; if(!r||r.borrado) return ""; return `<div class="item"><span class="grow"><b class="eid">${esc(r.animal?fmtEID(r.animal):r.sena||"Sin identificar")}</b><span class="small muted">${serieTxt(r)}</span></span><button class="chip bad" data-del="${r.id}">Borrar</button></div>`; }).join("")}</div></div>`;
 }
-function serieTxt(r){ return r.tipo==="tacto"?(r.resultado==="vacia"?"Vacía":"Preñada · "+r.resultado):r.tipo==="cc"?"CC "+String(r.valor).replace(".",","):(r.peso?r.peso+" kg":"")+(r.sexo?" · "+r.sexo:""); }
+const IA_SERV=[["iatf","IATF"],["celo","IA a celo"],["resinc","Re-IATF"]];
+const iaServ = v => (IA_SERV.find(x=>x[0]===v)||[,v||""])[1];
+function serieTxt(r){ return r.tipo==="ia"?[iaServ(r.servicio),r.pajuela?"toro "+r.pajuela:"",r.inseminador?"insem. "+r.inseminador:""].filter(Boolean).join(" · "):r.tipo==="tacto"?(r.resultado==="vacia"?"Vacía":"Preñada · "+r.resultado):r.tipo==="cc"?"CC "+String(r.valor).replace(".",","):(r.peso?r.peso+" kg":"")+(r.sexo?" · "+r.sexo:""); }
 function serieResumen(t){
   const rs=S.serie.map(id=>S.R[id]).filter(r=>r&&!r.borrado);
   if(!rs.length) return "";
   if(t==="tacto"){ const c={cabeza:0,cuerpo:0,cola:0,vacia:0}; rs.forEach(r=>c[r.resultado]++); const p=rs.length-c.vacia; return `<div class="chips" style="margin-bottom:8px"><span class="chip ok">Preñez ${f1(pct(p,rs.length))}%</span><span class="chip">Cabeza ${c.cabeza}</span><span class="chip">Cuerpo ${c.cuerpo}</span><span class="chip">Cola ${c.cola}</span><span class="chip bad">Vacías ${c.vacia}</span></div>`; }
+  if(t==="ia"){ const c={}; rs.forEach(r=>{ const k=r.pajuela||"sin toro"; c[k]=(c[k]||0)+1; }); return `<div class="chips" style="margin-bottom:8px"><span class="chip ok">Inseminadas ${rs.length}</span>${Object.entries(c).map(([k,n])=>`<span class="chip">${esc(k)}: ${n}</span>`).join("")}</div>`; }
   if(t==="cc"){ const v=rs.map(r=>Number(r.valor)); const m=v.reduce((a,b)=>a+b,0)/v.length; return `<div class="chips" style="margin-bottom:8px"><span class="chip ok">Promedio ${f1(m)}</span><span class="chip bad">CC &lt; 2,5: ${v.filter(x=>x<2.5).length}</span></div>`; }
   const w=rs.map(r=>num(r.peso)).filter(x=>x!=null); return w.length?`<div class="chips" style="margin-bottom:8px"><span class="chip ok">Peso promedio ${f0(w.reduce((a,b)=>a+b,0)/w.length)} kg</span></div>`:"";
 }
@@ -662,7 +668,7 @@ function construir(f){
     r.categoria="ternero";
   } else {
     const a=identOf(f,"animal"); r.animal=a.id; r.ident=a.ident; r.sena=a.sena;
-    ["categoria","causa","resultado","valor","momento","sexo","aptitud","tricho","campylo","tarea","producto","madre","pastura","remanente","aguada","movimiento","servicio","torosIds","vientres","toros","parcela","haParcela","bebida","molino","alambrado","mov","destino"].forEach(k=>{ if(f[k]!=null&&f[k]!=="") r[k]=f[k]; });
+    ["categoria","causa","resultado","valor","momento","sexo","aptitud","tricho","campylo","tarea","producto","madre","pastura","remanente","aguada","movimiento","servicio","torosIds","vientres","toros","parcela","haParcela","bebida","molino","alambrado","mov","destino","pajuela","inseminador"].forEach(k=>{ if(f[k]!=null&&f[k]!=="") r[k]=f[k]; });
     if(f.peso!=null) r.peso=num(f.peso); if(f.ce!=null) r.ce=num(f.ce); if(f.edad!=null) r.edad=num(f.edad); if(f.cantidad!=null) r.cantidad=num(f.cantidad); if(f.cabezas!=null&&f.cabezas!=="") r.cabezas=num(f.cabezas);
     if(f.tipo==="lote") r.resultado=f.movimiento||"control";
     if(f.tipo==="entore"){ r.resultado=f.movimiento||"inicio"; if(r.vientres!=null) r.vientres=num(r.vientres); if(r.toros!=null) r.toros=num(r.toros); }
@@ -687,6 +693,8 @@ function validar(f){
   if(f.tipo==="muerte" && !f.categoria) f.categoria="ternero";
   if(f.tipo==="muerte" && f.cabezas!=null && String(f.cabezas).trim()!=="" && !(num(f.cabezas)>=1)) return "La cantidad tiene que ser 1 o más";
   if(f.tipo==="tacto" && !f.resultado) return "Marcá el resultado del tacto";
+  if(f.tipo==="ia" && !String(f.animal||"").trim()) return "Falta la caravana";
+  if(f.tipo==="ia" && !f.servicio) return "Marcá el servicio (IATF, celo o re-IATF)";
   if(f.tipo==="cc" && !f.valor) return "Marcá la condición corporal";
   if((f.tipo==="destete"||f.tipo==="pesada") && num(f.peso)==null) return "Falta el peso";
   if(f.tipo==="sanidad" && !f.tarea) return "Elegí la tarea del plan";
@@ -705,12 +713,13 @@ function guardar(){
   const f=S.f; const err=validar(f); if(err){ toast(err); return; }
   const r=construir(f); put(r); vibrar();
   if(f.potrero) S.set.potrero=f.potrero; if(f.lote){ S.set.lote=f.lote; S.set.loteId=f.loteId||""; } persist();
-  const serie=["tacto","cc","destete","pesada"].includes(f.tipo) && !S.editId;
+  const serie=["tacto","cc","destete","pesada","ia"].includes(f.tipo) && !S.editId;
   if(serie){
     S.serie.push(r.id);
-    S.f={tipo:f.tipo, fecha:f.tipo==="destete"||f.tipo==="pesada"?f.fecha:nowLocal(), lote:f.lote, categoria:f.categoria, momento:f.momento, animalTipo:f.animalTipo, potrero:f.potrero, sexo:""};
-    toast(r.tipo==="tacto"?`Guardada: ${r.resultado==="vacia"?"vacía":r.resultado}`:"Guardado");
-    render(); setTimeout(()=>{ const el=$("#in-animal"); el&&el.focus(); },50);
+    S.f={tipo:f.tipo, fecha:["destete","pesada","ia"].includes(f.tipo)?f.fecha:nowLocal(), lote:f.lote, loteId:f.loteId, categoria:f.categoria, momento:f.momento, animalTipo:f.animalTipo, potrero:f.potrero, sexo:""};
+    if(f.tipo==="ia"){ S.f.servicio=f.servicio; S.f.pajuela=f.pajuela; S.f.inseminador=f.inseminador; if(f._cola){ S.f._cola=f._cola; if(f._cola.length) S.f.animal=f._cola.shift(); } }
+    toast(r.tipo==="tacto"?`Guardada: ${r.resultado==="vacia"?"vacía":r.resultado}`:r.tipo==="ia"?`Inseminada ${r.animal?fmtEID(r.animal):""}${S.f._cola?` · quedan ${S.f._cola.length+(S.f.animal?1:0)}`:""}`:"Guardado");
+    render(); setTimeout(()=>{ const el=$("#in-animal"); el&&!S.f.animal&&el.focus(); },50);
     return;
   }
   if(f.tipo==="parto" && !S.editId){
@@ -726,7 +735,7 @@ function guardar(){
 const SECC = [["campo","Campo"],["manga","Manga"],["oficina","Oficina"]];
 const HOJAS = {
   campo:[["parto","Parto"],["muerte","Muerte"],["novedad","Novedad"],["lote","Recorrida de lote"],["instal","Bebidas y molino"]],
-  manga:[["tacto","Tacto"],["cc","Condición corporal"],["destete","Destete"],["pesada","Pesada"],["toro","Toros"],["entore","Entore"],["sanidad","Sanidad"],["hacienda","Entradas y salidas"]],
+  manga:[["tacto","Tacto"],["ia","Inseminación"],["cc","Condición corporal"],["destete","Destete"],["pesada","Pesada"],["toro","Toros"],["entore","Entore"],["sanidad","Sanidad"],["hacienda","Entradas y salidas"]],
   oficina:[["resumen","Resumen"],["lotes","Lotes"],["indicadores","Indicadores"],["indices","Índices"],["calendario","Calendario"],["datos","Datos"],["ajustes","Ajustes"]]
 };
 const claves = (E=estab()) => E.claves||{};
@@ -840,6 +849,7 @@ function renderHome(){
     <p class="muted small">Carga en serie: identificás el animal, marcás el resultado y pasa solo al siguiente. Funciona con bastón lector.</p>
     <div class="grid">
       <button class="big dark" data-new="tacto"><b>Tacto${lk("manga","tacto")}</b><span>Cabeza, cuerpo, cola, vacía</span></button>
+      <button class="big" data-new="ia"><b>Inseminación${lk("manga","ia")}</b><span>Por caravana: IATF, celo, toro</span></button>
       <button class="big" data-new="cc"><b>Condición corporal${lk("manga","cc")}</b><span>1 a 5 por animal</span></button>
       <button class="big" data-new="destete"><b>Destete${lk("manga","destete")}</b><span>Peso y sexo</span></button>
       <button class="big" data-new="pesada"><b>Pesada${lk("manga","pesada")}</b><span>Cualquier categoría</span></button>
@@ -917,7 +927,7 @@ function renderForm(){
 function renderSavebar(){
   const sb=$("#savebar");
   if(S.view!=="form"||!S.f){ sb.innerHTML=""; return; }
-  const t=S.f.tipo, label=S.editId?"Guardar cambios":t==="tacto"?"Guardar y siguiente":["cc","destete","pesada"].includes(t)?"Guardar y siguiente":"Guardar";
+  const t=S.f.tipo, label=S.editId?"Guardar cambios":t==="tacto"?"Guardar y siguiente":["cc","destete","pesada","ia"].includes(t)?"Guardar y siguiente":"Guardar";
   if(t==="tacto"&&!S.editId){ sb.innerHTML=`<div class="savebar"><div class="in"><button class="btn block" data-back="1">Terminar tanda</button></div></div>`; return; }
   sb.innerHTML=`<div class="savebar"><div class="in"><button class="btn solid" data-save="1">${label}</button></div></div>`;
 }
@@ -938,6 +948,7 @@ function parseQuery(q){
   const add=(t,l)=>{ if(!F.tipos.includes(t)){ F.tipos.push(t); why.push(l); } };
   if(/part|naci|paricion|parieron/.test(s)) add("parto","partos");
   if(/tact|prenez|prenad/.test(s)) add("tacto","tacto");
+  if(/insemin|\biatf\b|\bia\b/.test(s)) add("ia","inseminaciones");
   if(/destet/.test(s)) add("destete","destete");
   if(/pesad/.test(s)) add("pesada","pesadas");
   if(/\btoro/.test(s)) add("toro","toros");
@@ -1014,6 +1025,7 @@ function metricas(rs){
   if(t==="tacto") cols.push(["pr","% preñez",r=>f1(pct(r.filter(x=>x.resultado!=="vacia").length,r.length))],["ca","Cabeza",r=>r.filter(x=>x.resultado==="cabeza").length],["cu","Cuerpo",r=>r.filter(x=>x.resultado==="cuerpo").length],["co","Cola",r=>r.filter(x=>x.resultado==="cola").length],["va","Vacías",r=>r.filter(x=>x.resultado==="vacia").length]);
   if(t==="destete"||t==="pesada") cols.push(["pp","Peso prom.",r=>{const w=r.map(x=>num(x.peso)).filter(x=>x!=null);return w.length?f0(w.reduce((a,b)=>a+b,0)/w.length):"—";}],["kg","Kg totales",r=>f0(r.reduce((a,x)=>a+(num(x.peso)||0),0))]);
   if(t==="cc") cols.push(["cc","CC prom.",r=>{const w=r.map(x=>num(x.valor)).filter(x=>x!=null);return w.length?f1(w.reduce((a,b)=>a+b,0)/w.length):"—";}],["lo","CC < 2,5",r=>r.filter(x=>num(x.valor)<2.5).length]);
+  if(t==="ia") cols.push(["it","IATF",r=>r.filter(x=>x.servicio==="iatf").length],["ic","A celo",r=>r.filter(x=>x.servicio==="celo").length],["ir","Resinc.",r=>r.filter(x=>x.servicio==="resinc").length],["tp","Toros",r=>new Set(r.map(x=>x.pajuela).filter(Boolean)).size]);
   if(t==="toro") cols.push(["ap","Aptos",r=>r.filter(x=>x.resultado==="apto").length],["na","No aptos",r=>r.filter(x=>x.resultado==="no apto").length]);
   if(t==="lote") cols.push(["pm","Pastura reg./mala",r=>r.filter(x=>x.pastura==="malo"||x.pastura==="regular").length],["rb","Remanente bajo",r=>r.filter(x=>x.remanente==="bajo").length],["ag","Aguada reg./mala",r=>r.filter(x=>x.aguada==="regular"||x.aguada==="malo").length],["in","Entradas",r=>r.filter(x=>x.movimiento==="ingreso").length],["eg","Salidas",r=>r.filter(x=>x.movimiento==="egreso").length]);
   if(t==="hacienda") cols.push(["hc","Cabezas",r=>f0(r.reduce((a,x)=>a+(num(x.cabezas)||0),0))],["hk","Kg",r=>f0(r.reduce((a,x)=>a+(num(x.kgTot)||0),0))]);
@@ -1129,7 +1141,7 @@ function textoResumen(rs,titulo){
 }
 async function copiar(txt){ try{ await navigator.clipboard.writeText(txt); toast("Copiado. Pegalo en WhatsApp."); }catch(_){ S.copyTxt=txt; render(); window.scrollTo(0,0); } }
 function csv(rs){
-  const cols=["fecha","tipo","campana","animal","ident","sena","madre","madreIdent","madreSena","sexo","estado","resultado","valor","peso","dificultad","causa","categoria","potrero","parcela","haParcela","lote","detalle","producto","cantidad","ce","aptitud","tricho","campylo","pastura","remanente","aguada","movimiento","cabezas","bebida","molino","alambrado","mov","kgTot","destino","operario","obs","lat","lng"];
+  const cols=["fecha","tipo","campana","animal","ident","sena","madre","madreIdent","madreSena","sexo","estado","resultado","valor","peso","dificultad","causa","categoria","potrero","parcela","haParcela","lote","detalle","producto","cantidad","ce","aptitud","tricho","campylo","pastura","remanente","aguada","movimiento","cabezas","bebida","molino","alambrado","mov","kgTot","destino","servicio","pajuela","inseminador","operario","obs","lat","lng"];
   const q=v=>{ v=v==null?"":String(v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const body=[cols.join(";")].concat(rs.map(r=>cols.map(c=>q(c==="campana"?campOf(r):r[c])).join(";"))).join("\n");
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+body],{type:"text/csv"})); a.download=`rodeo-cria-${S.set.estab}-${todayStr()}.csv`; a.click();
@@ -1304,7 +1316,7 @@ function parseBaston(txt){
 function renderImport(){
   const I=S.imp, conPeso=I.rows.filter(r=>r.peso!=null).length;
   return `<div style="margin-top:12px"><p><b>${I.rows.length} caravanas leídas</b>${conPeso?` · ${conPeso} con peso`:""}</p>
-    ${fld("Qué hacer con esta lectura", seg("impAccion",[["sanidad","Sanidad / vacuna"],["pesada","Pesada"],["destete","Destete"],["tacto","Tacto"]],I.accion,"g2"))}
+    ${fld("Qué hacer con esta lectura", seg("impAccion",[["sanidad","Sanidad / vacuna"],["pesada","Pesada"],["destete","Destete"],["tacto","Tacto"],["ia","Inseminación"]],I.accion,"g2"))}
     ${I.accion==="sanidad"?fld("Tarea del plan",`<select id="imp-tarea">${estab().plan.map(t=>`<option value="${t.id}">${esc(t.grupo)} · ${esc(tareaNom(t))}</option>`).join("")}</select>`)+fld("Producto",`<input type="text" id="imp-prod">`):""}
     <div class="row2">${fld("Fecha",`<input type="date" id="imp-fecha" value="${todayStr()}">`)}${fld("Lote",`<input type="text" id="imp-lote">`)}</div>
     <button class="btn solid block" data-impok="1">Cargar</button></div>`;
@@ -1314,6 +1326,8 @@ function aplicarImport(){
   if(I.accion==="sanidad"){
     const f={tipo:"sanidad", fecha, lote, tarea:$("#imp-tarea").value, producto:$("#imp-prod").value, cantidad:I.rows.length, lista:I.rows.map(r=>r.eid), animalTipo:"sin"};
     S.editId=null; put(construir(f)); toast(`Sanidad registrada para ${I.rows.length} animales`);
+  } else if(I.accion==="ia"){
+    S.imp=null; nuevo("ia",{lote, animalTipo:"eid", fecha}); S.f._cola=I.rows.map(r=>r.eid); S.f.animal=S.f._cola.shift(); render(); toast("Poné el toro y el servicio, y guardá cada una"); return;
   } else if(I.accion==="tacto"){
     S.imp=null; nuevo("tacto",{lote, animalTipo:"eid"}); S.f._cola=I.rows.map(r=>r.eid); S.f.animal=S.f._cola.shift(); render(); toast("Marcá el resultado de cada una"); return;
   } else {
@@ -1567,7 +1581,7 @@ document.addEventListener("click", e=>{
 const auto=(campo,v)=>{ f._auto=f._auto||{}; const cur=String(f[campo]??"").trim(); if(cur==="" || cur===f._auto[campo]){ f[campo]=v?String(v):""; f._auto[campo]=f[campo]; } };
 if(f.tipo==="sanidad") auto("cantidad", same?"":cabLote(l));
 if(f.tipo==="entore"){ auto("vientres", same?"":(vientresLote(l)||cabLote(l))); auto("toros", same?"":sumCats(l,x=>norm(x.nombre).includes("toro"))); } if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela"){ f.parcela=u.parcela; f.haParcela=u.haParcela!=null?String(u.haParcela):""; } } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
-    f[k] = (f[k]===v && !["sexo","estado","madreTipo","animalTipo","terneroTipo","categoria","resultado","valor","movimiento","mov"].includes(k)) ? "" : v;
+    f[k] = (f[k]===v && !["sexo","estado","madreTipo","animalTipo","terneroTipo","categoria","resultado","valor","movimiento","mov","servicio"].includes(k)) ? "" : v;
     if(k==="resultado"&&f.tipo==="tacto"&&!S.editId){ guardarTactoCola(); return; }
     const y=window.scrollY; render(); window.scrollTo(0,y);
     if(/Tipo$/.test(k)){ const el=$("#in-"+k.replace("Tipo","")); el&&el.focus(); }
@@ -1678,6 +1692,7 @@ document.addEventListener("keydown", e=>{
     if(t.dataset && (t.dataset.f==="animal"||t.dataset.f==="madre"||t.dataset.f==="ternero"||t.dataset.f==="peso")){
       e.preventDefault(); t.blur();
       if(S.f && ["cc","destete","pesada"].includes(S.f.tipo) && t.dataset.f==="peso"){ guardar(); return; }
+      if(S.f && S.f.tipo==="ia" && t.dataset.f==="animal"){ S.f.animal=t.value; guardar(); return; }
       if(S.f && (S.f.tipo==="destete"||S.f.tipo==="pesada") && t.dataset.f==="animal"){ const p=$("#in-peso"); p&&p.focus(); }
     }
   }
