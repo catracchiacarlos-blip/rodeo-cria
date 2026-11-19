@@ -374,7 +374,7 @@ function mezclarCfg(base, local, server){
   new Set([...Object.keys(local),...Object.keys(base)]).forEach(k=>{
     if(k==="actualizadoLocal"||k==="actualizado") return;
     if(jss(local[k])===jss(base[k])) return;            // este equipo no lo cambió: queda lo del servidor
-    if(k==="lotes" && Array.isArray(local[k])){ out[k]=mezclarLista(base[k],local[k],server[k]); return; }
+    if(["lotes","pajuelas","inseminadores"].includes(k) && Array.isArray(local[k])){ out[k]=mezclarLista(base[k],local[k],server[k]); return; }
     if(local[k]===undefined) delete out[k]; else out[k]=local[k];
   });
   out.actualizadoLocal=local.actualizadoLocal;
@@ -635,7 +635,7 @@ function formSerie(f){
   const cuenta=serieResumen(t);
   return `<h1>${titulo} en manga</h1>
   <div class="card">${lotePick(f)}<div class="row2">${fld("Lote / rodeo", inp("lote",f.lote,{ph:"Ej. vacas 2° servicio"}))}${t==="tacto"||t==="cc"?fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaq."]],f.categoria||"vaca")):fld("Fecha", inp("fecha",f.fecha.slice(0,10),{type:"date"}))}</div>
-  ${t==="ia"?fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaquillona"]],f.categoria||"vaca"))+fld("Servicio", seg("servicio",IA_SERV,f.servicio))+`<div class="row2">${fld("Toro / pajuela", inp("pajuela",f.pajuela,{ph:"Nombre o código del toro"}))}${fld("Inseminador", inp("inseminador",f.inseminador,{ph:"Opcional"}))}</div>`:""}
+  ${t==="ia"?fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaquillona"]],f.categoria||"vaca"))+fld("Servicio", seg("servicio",IA_SERV,f.servicio))+`<div class="row2">${fld("Toro / pajuela", selBase("pajuelas","pajuela",f.pajuela,"Elegir toro…"))}${fld("Inseminador", selBase("inseminadores","inseminador",f.inseminador,"Elegir (opcional)…"))}</div>${altaBase(f)}`:""}
   ${t==="cc"?fld("Momento", seg("momento",[["servicio","Servicio"],["tacto","Tacto"],["preparto","Preparto"],["destete","Destete"]],f.momento)):""}
   ${t==="pesada"?fld("Categoría", seg("categoria",[["vaca","Vaca"],["vaquillona","Vaquillona"],["ternero","Ternero"],["toro","Toro"]],f.categoria)):""}</div>
   ${idBlock("animal",f,t==="destete"?"Ternero":t==="ia"?"Caravana de la vaca":"Animal",t!=="destete"&&t!=="ia")}
@@ -643,6 +643,39 @@ function formSerie(f){
   ${t==="tacto"?`<p class="small muted">Al tocar el resultado se guarda y pasa a la siguiente.</p>`:""}
   <div class="card"><h3 style="margin-top:0">Cargados en esta tanda: ${S.serie.length}</h3>${cuenta}
   <div class="serie">${S.serie.slice().reverse().map(id=>{ const r=S.R[id]; if(!r||r.borrado) return ""; return `<div class="item"><span class="grow"><b class="eid">${esc(r.animal?fmtEID(r.animal):r.sena||"Sin identificar")}</b><span class="small muted">${serieTxt(r)}</span></span><button class="chip bad" data-del="${r.id}">Borrar</button></div>`; }).join("")}</div></div>`;
+}
+/* ----- base de toros (pajuelas) e inseminadores del establecimiento ----- */
+const BASES={pajuelas:{n:"Toros / pajuelas",uno:"toro",campo:"pajuela"},inseminadores:{n:"Inseminadores",uno:"inseminador",campo:"inseminador"}};
+const baseLista = (k,E) => ((E||estab())[k]||[]).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+const pajTxt = x => [x.nombre,x.raza,x.codigo].filter(Boolean).join(" · ");
+function selBase(k,campo,val,ph){
+  const L=baseLista(k), v=val||"", esta=!v||L.some(x=>x.nombre===v);
+  return `<select data-f="${campo}" data-base="${k}"><option value="">${ph}</option>${L.map(x=>`<option value="${esc(x.nombre)}" ${x.nombre===v?"selected":""}>${esc(k==="pajuelas"?pajTxt(x):x.nombre)}</option>`).join("")}${esta?"":`<option value="${esc(v)}" selected>${esc(v)} (no está en la lista)</option>`}<option value="__nuevo__">＋ Agregar ${BASES[k].uno} nuevo…</option></select>`+(L.length?"":`<span class="small muted">La lista está vacía: agregá el primero.</span>`);
+}
+function altaBase(f){
+  const k=f&&f._alta; if(!k) return "";
+  return `<div class="kblock" style="margin:8px 0"><b>Nuevo ${BASES[k].uno}</b>
+    ${k==="pajuelas"?`<div class="row2">${fld("Nombre del toro",`<input type="text" id="alta-n" autocomplete="off" placeholder="Ej. Bismarck">`)}${fld("Raza",`<input type="text" id="alta-r" autocomplete="off" placeholder="Opcional">`)}</div>${fld("Código / centro",`<input type="text" id="alta-c" autocomplete="off" placeholder="Opcional (HBA, centro de IA)">`)}`:fld("Nombre",`<input type="text" id="alta-n" autocomplete="off" placeholder="Nombre del inseminador">`)}
+    <div style="display:flex;gap:8px"><button class="btn solid" data-altabase="${k}">Agregar a la lista</button><button class="btn" data-altano="1">Cancelar</button></div></div>`;
+}
+function agregarBase(k,datos){
+  const n=(datos.nombre||"").trim(); if(!n){ toast("Escribí el nombre"); return null; }
+  const E=estab(); E[k]=E[k]||[];
+  if(E[k].some(x=>norm(x.nombre)===norm(n))){ toast("Ya está en la lista"); return E[k].find(x=>norm(x.nombre)===norm(n)).nombre; }
+  const x={id:uid(),nombre:n}; if(k==="pajuelas"){ if(datos.raza&&datos.raza.trim()) x.raza=datos.raza.trim(); if(datos.codigo&&datos.codigo.trim()) x.codigo=datos.codigo.trim(); }
+  E[k].push(x); saveEstab(E); toast(`Agregado: ${n}`); return n;
+}
+function renderBases(){
+  const E=estab(), ia=eventos().filter(r=>r.tipo==="ia");
+  return `<details class="card" id="bases" ${S.basesAbiertas?"open":""}><summary><b>Toros e inseminadores de ${esc(E.nombre)}</b> · editar</summary>
+    <p class="small muted">Son las opciones que aparecen para elegir en Manga → Inseminación. Son de este establecimiento y se sincronizan con todos los equipos.</p>
+    ${Object.entries(BASES).map(([k,B])=>{ const L=baseLista(k,E), sueltos=[...new Set(ia.map(r=>r[B.campo]).filter(v=>v&&!L.some(x=>norm(x.nombre)===norm(v))))];
+      return `<div class="lbl" style="margin:12px 0 4px">${B.n} (${L.length})</div>
+      <div class="list">${L.map(x=>`<div class="item"><span class="grow"><b>${esc(x.nombre)}</b><span class="small muted">${esc([x.raza,x.codigo,ia.filter(r=>r[B.campo]===x.nombre).length+" IA"].filter(Boolean).join(" · "))}</span></span><button class="chip bad" data-bajabase="${k}|${x.id}">Quitar</button></div>`).join("")||`<p class="small muted">Todavía no hay ${B.n.toLowerCase()}.</p>`}</div>
+      ${k==="pajuelas"?`<div class="row2">${fld("Toro",`<input type="text" id="bs-pajuelas-n" placeholder="Nombre">`)}${fld("Raza",`<input type="text" id="bs-pajuelas-r" placeholder="Opcional">`)}</div>${fld("Código / centro",`<input type="text" id="bs-pajuelas-c" placeholder="Opcional">`)}`:fld("Inseminador",`<input type="text" id="bs-inseminadores-n" placeholder="Nombre">`)}
+      <button class="btn" data-bsadd="${k}">Agregar</button>
+      ${sueltos.length?`<p class="small" style="margin:8px 0 4px">Cargados en inseminaciones y que no están en la lista: <b>${sueltos.map(esc).join(", ")}</b></p><button class="btn" data-bstraer="${k}">Agregarlos a la lista</button>`:""}`; }).join("")}
+  </details>`;
 }
 const IA_SERV=[["iatf","IATF"],["celo","IA a celo"],["resinc","Re-IATF"]];
 const iaServ = v => (IA_SERV.find(x=>x[0]===v)||[,v||""])[1];
@@ -1484,6 +1517,7 @@ function renderAjustes(){
       <button class="btn block" data-lockall="1" style="margin-top:8px">Bloquear este celular</button></div>
     <button class="btn solid block" data-ajok="1" style="margin-top:12px">Guardar ajustes</button></div>
   ${esAdmin()?renderUsuarios()+renderCampos():""}
+  ${renderBases()}
   ${editorMetas()}
   <div class="card"><h3 style="margin-top:0">Instalar en el celular</h3><p class="small" style="margin:0 0 8px">${textoInstalar()}</p>${INST.evento&&!instalada()?`<button class="btn solid block" data-instalar="1">Instalar</button>`:""}</div>
   <p class="small muted">Registros en este celular: ${eventos().length} · sin subir: ${Object.keys(S.outbox).length}${S.lastSync?` · última sincronización: ${new Date(S.lastSync).toLocaleString("es-AR")}`:""}</p>`;
@@ -1562,6 +1596,11 @@ document.addEventListener("click", e=>{
   if(d.codnuevo){ const v=($("#cod-nuevo").value||"").trim().toUpperCase(); if(!v){ toast("Escribí el código"); return; } S.set.codigo=v; S.codMal=false; S.syncState="idle"; persist(); render(); sync(); return; }
   if(d.copylink){ const c=camposAdmin().find(x=>x.codigo===d.copylink); if(c) copiar(`App de rodeo de cría · ${c.nombre}\n${linkCampo(c)}`); return; }
   if(d.nuevocampo){ nuevoCampo(); return; }
+  if(d.altabase && S.f){ const k=d.altabase, n=agregarBase(k,{nombre:($("#alta-n")||{}).value,raza:($("#alta-r")||{}).value,codigo:($("#alta-c")||{}).value}); if(n==null) return; S.f[BASES[k].campo]=n; S.f._alta=null; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+  if(d.altano && S.f){ S.f._alta=null; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+  if(d.bsadd){ const k=d.bsadd; if(agregarBase(k,{nombre:($("#bs-"+k+"-n")||{}).value,raza:($("#bs-"+k+"-r")||{}).value,codigo:($("#bs-"+k+"-c")||{}).value})==null) return; S.basesAbiertas=true; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+  if(d.bstraer){ const k=d.bstraer, B=BASES[k], E=estab(); E[k]=E[k]||[]; let n=0; [...new Set(eventos().filter(r=>r.tipo==="ia").map(r=>r[B.campo]).filter(Boolean))].forEach(v=>{ if(!E[k].some(x=>norm(x.nombre)===norm(v))){ E[k].push({id:uid(),nombre:v}); n++; } }); if(n) saveEstab(E); S.basesAbiertas=true; toast(`Agregados: ${n}`); const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+  if(d.bajabase){ if(!armar(b,"¿Quitar? Tocá de nuevo")) return; const [k,id]=d.bajabase.split("|"), E=estab(); E[k]=(E[k]||[]).filter(x=>x.id!==id); saveEstab(E); S.basesAbiertas=true; toast("Quitado de la lista (las inseminaciones cargadas no cambian)"); const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(d.usract){ usrToggle(b,d.usract); return; }
   if(d.subirtodo){ if(!armar(b,"Tocá de nuevo para subir todo")) return; Object.keys(S.R).forEach(id=>S.outbox[id]=true); persist(); sync(); toast("Subiendo todo…"); render(); return; }
   if(d.instno){ INST.oculto=true; try{ localStorage.setItem("rc-inst-no","1"); }catch(_){} toast("Lo podés instalar después desde Oficina → Ajustes"); render(); return; }
@@ -1664,6 +1703,7 @@ function anotarLote(t){
 document.addEventListener("input", e=>{
   if(anotarLote(e.target)) return;
   const t=e.target, d=t.dataset;
+  if(d.base) return; // los desplegables de la base se manejan en "change"
   if(d.f && S.f){ S.f[d.f]=t.value; if((d.f==="madre"||d.f==="animal"||d.f==="ternero")) marcaBaston(t,d.f); return; }
   if(t.id==="buscar"){ S.buscar=t.value; clearTimeout(S.bt); S.bt=setTimeout(()=>{ const pos=t.selectionStart; render(); const el=$("#buscar"); el.focus(); el.setSelectionRange(pos,pos); },350); return; }
 });
@@ -1671,6 +1711,7 @@ document.addEventListener("change", e=>{
   if(anotarLote(e.target)) return;
   const t=e.target, d=t.dataset;
   if(t.id==="sel-estab"){ S.set.estab=t.value; S.filt=null; S.why=null; S.loteF=null; persist(); render(); return; }
+  if(d.base && S.f && t.value==="__nuevo__"){ S.f._alta=d.base; const y=window.scrollY; render(); window.scrollTo(0,y); setTimeout(()=>{ const el=$("#alta-n"); el&&el.focus(); },50); return; }
   if(d.f && S.f){ S.f[d.f]=t.value; if(d.f==="tarea"||(d.f==="cabezas"&&S.f.tipo==="muerte")||(S.f.tipo==="entore"&&(d.f==="toros"||d.f==="vientres"))){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
   if(d.filt){ S.filt[d.filt]=t.value; S.why=null; render(); return; }
   if(d.camp){ const E=estab(); E.campanas[S.campSel]=E.campanas[S.campSel]||{}; E.campanas[S.campSel][d.camp]=(t.type==="number"||t.inputMode==="decimal")?num(t.value):t.value; saveEstab(E); render(); return; }
