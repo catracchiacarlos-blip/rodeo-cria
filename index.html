@@ -981,7 +981,8 @@ function renderSavebar(){
 function renderOficina(){
   const tabs=HOJAS.oficina;
   if(!hojaAbierta("oficina",S.sub)){ const ab=tabs.find(([k])=>hojaAbierta("oficina",k)); if(ab && !S.subPedida) S.sub=ab[0]; }
-  const head=`${banners()}<div class="subtabs">${tabs.map(([k,l])=>`<button data-sub="${k}" aria-current="${S.sub===k?"page":"false"}">${l}${hojaAbierta("oficina",k)?"":" 🔒"}</button>`).join("")}</div>`;
+  const volver = (S.sub!=="resumen" && !(S.sub==="lotes" && S.loteEd)) ? `<button class="back" data-subback="1">← Volver</button>` : "";
+  const head=`${volver}${banners()}<div class="subtabs">${tabs.map(([k,l])=>`<button data-sub="${k}" aria-current="${S.sub===k?"page":"false"}">${l}${hojaAbierta("oficina",k)?"":" 🔒"}</button>`).join("")}</div>`;
   if(!hojaAbierta("oficina",S.sub)) return head+renderLock("oficina",S.sub);
   const b = S.sub==="lotes"?renderLotes(): S.sub==="indices"?renderIndices(): S.sub==="indicadores"?renderIndicadores(): S.sub==="calendario"?renderCalendario(): S.sub==="datos"?renderDatos(): S.sub==="ajustes"?renderAjustes(): renderResumen();
   return head+b;
@@ -1620,7 +1621,8 @@ document.addEventListener("click", e=>{
   if(d.save){ guardar(); return; }
   if(d.edit){ editar(d.edit); return; }
   if(d.del){ if(!armar(b,"Tocá de nuevo para borrar")) return; const r=S.R[d.del]; if(r){ r.borrado=true; put(r); } S.serie=S.serie.filter(x=>x!==d.del); if(S.editId===d.del){ S.f=null; S.editId=null; S.view="home"; } toast("Borrado"); render(); return; }
-  if(d.sub){ S.sub=d.sub; S.subPedida=true; render(); return; }
+  if(d.sub){ if(d.sub!==S.sub){ S.subHist=(S.subHist||[]).filter(x=>x!==d.sub); S.subHist.push(S.sub); if(S.subHist.length>20) S.subHist.shift(); } S.sub=d.sub; S.subPedida=true; render(); window.scrollTo(0,0); return; }
+  if(d.subback){ const h=S.subHist||[]; let v=h.pop(); while(v===S.sub) v=h.pop(); S.sub=v||"resumen"; S.subPedida=true; render(); window.scrollTo(0,0); return; }
   if(d.lkback){ S.lockH=null; render(); return; }
   if(d.set!==undefined){
     const k=d.set, v=d.v;
