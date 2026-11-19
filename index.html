@@ -199,7 +199,8 @@ const TIPOS = {
   sanidad:{n:"Sanidad / tarea",pl:"Sanidad y tareas"}, destete:{n:"Destete",pl:"Destetes"}, pesada:{n:"Pesada",pl:"Pesadas"},
   lote:{n:"Recorrida de lote",pl:"Recorridas de lote"}, entore:{n:"Entore",pl:"Entores"}, hacienda:{n:"Entrada/salida de hacienda",pl:"Entradas y salidas de hacienda"}, instal:{n:"Bebidas, molino y alambrados",pl:"Controles de instalaciones"}
 };
-const CATS_BASE = [{id:"vacasPre",nombre:"Vacas preñadas",vientre:true,ev:1},{id:"vacasVac",nombre:"Vacas vacías",ev:0.85},{id:"vacasCria",nombre:"Vacas con cría",ev:1},{id:"vaqPre",nombre:"Vaquillonas preñadas",vientre:true,ev:0.9},{id:"vaq",nombre:"Vaquillonas",ev:0.7},{id:"terneros",nombre:"Terneros/as",ev:0.4},{id:"toros",nombre:"Toros",ev:1.3}];
+const CATS_BASE = [{id:"vacasPre",nombre:"Vacas preñadas",vientre:true,ev:1},{id:"vacasVac",nombre:"Vacas vacías",ev:0.85},{id:"vacasCria",nombre:"Vacas con cría",ev:1},{id:"vaqPre",nombre:"Vaquillonas preñadas",vientre:true,ev:0.9},{id:"vaq",nombre:"Vaquillonas",ev:0.7},{id:"terneros",nombre:"Terneros/as",ev:0.4},{id:"toros",nombre:"Toros",ev:1.3},{id:"vaqRech",nombre:"Vaquillona rechazo",ev:0.7},{id:"vacaRech",nombre:"Vaca rechazo",ev:0.85},{id:"toroRech",nombre:"Toro rechazo",ev:1.3}];
+const CATS_RECH = ["vaqRech","vacaRech","toroRech"];
 const MOVS = [["venta","Venta"],["refugo","Refugo"],["compra","Compra"],["trasEnt","Entra de otro campo"],["trasSal","Sale a otro campo"],["cesEnt","Entra por cesión"],["cesSal","Sale por cesión"],["consumo","Consumo"],["otras","Salida (otras causas)"]];
 /* una muerte puede ser de varias cabezas (campo "cabezas"); el resto de los registros cuenta 1 */
 const nCab = arr => arr.reduce((a,e)=>a+(e.tipo==="muerte"?(num(e.cabezas)||1):1),0);
@@ -351,6 +352,15 @@ function limpiarClaves(){
     r.claves={hojas:{}}; saveEstab(r);
   });
 }
+// pedido de Carlos (19/11/2026): categorías de rechazo en los lotes. Los campos con categorías propias las reciben una sola vez
+// (marca catsRech): si después alguien las quita, no vuelven.
+function agregarCatsRech(){
+  Object.values(S.R).filter(r=>r.tipo==="estab"&&!r.borrado&&!r.catsRech).forEach(r=>{
+    if(r.cats&&r.cats.length){ const tiene=new Set(r.cats.map(c=>c.id)), nom=new Set(r.cats.map(c=>norm(c.nombre)));
+      CATS_BASE.filter(c=>CATS_RECH.includes(c.id)&&!tiene.has(c.id)&&!nom.has(norm(c.nombre))).forEach(c=>r.cats.push({...c})); }
+    r.catsRech=1; saveEstab(r);
+  });
+}
 const campoNombre = id => ((S.set.campos||[]).find(c=>c.estab===id)||{}).nombre;
 const listaEstabs = () => { const m={}; if(esAdmin()) (S.set.campos||[]).forEach(c=>m[c.estab]=c.nombre); else if(S.set.rol==="campo"){ return {[S.set.estab]:estab().nombre}; } Object.values(S.R).filter(r=>r.tipo==="estab"&&!r.borrado).forEach(r=>m[r.estab]=r.nombre); if(S.set.estab && !m[S.set.estab]) m[S.set.estab]=estab().nombre; if(!Object.keys(m).length) m[ESTAB_DEFAULT.id]=ESTAB_DEFAULT.nombre; return m; };
 
@@ -428,7 +438,7 @@ async function sync(){
       chunk.forEach(id=>{ const x=S.R[id]; if(x && x.clase==="config") S.base[id]=JSON.parse(JSON.stringify(x)); if(x && x.actualizadoLocal===vers[id]) delete S.outbox[id]; });
     }
     S.syncState="ok"; S.syncErr=""; S.codMal=false;
-    registrarUsuario(); limpiarClaves();
+    registrarUsuario(); limpiarClaves(); agregarCatsRech();
     persist();
     if(!S.f && S.view!=="setup") renderSiSePuede();
   }catch(e){
@@ -1204,7 +1214,7 @@ function calcCamp(c){
   const muertosP=par.filter(e=>e.estado==="muerto").length, vivos=par.length-muertosP;
   const pesos=des.map(e=>num(e.peso)).filter(x=>x!=null), kgDest=pesos.reduce((a,b)=>a+b,0);
   const ent=entoreCamp(c);
-  const toros=num(cfg.toros) ?? ent.toros ?? (lo ? (lo.l?sumCats(lo.l,x=>norm(x.nombre).includes("toro"))||null:null) : null);
+  const toros=num(cfg.toros) ?? ent.toros ?? (lo ? (lo.l?sumCats(lo.l,x=>norm(x.nombre).includes("toro")&&!norm(x.nombre).includes("rechazo"))||null:null) : null);
   return {c,cfg,ent,lo,vientres,tac:tac.length,pre,vac,cab,cue,col,partos:par.length,vivos,muertosP,machos:par.filter(e=>e.sexo==="M").length,hembras:par.filter(e=>e.sexo==="H").length,dist:par.filter(e=>Number(e.dificultad)>=3).length,
     mt:nCab(mt),dest:des.length,pesoDest:pesos.length?kgDest/pesos.length:null,kgDest,
     prenez:pct(pre,tac.length),pcab:pct(cab,pre),paricion:pct(par.length,vientres),mortPeri:pct(muertosP,par.length),mortDest:pct(nCab(mt),vivos),destete:pct(des.length,vientres),kgVaca:vientres&&pesos.length?kgDest/vientres:null,perdida:pre?pct(pre-par.length,pre):null,torosPct:pct(toros,vientres),par};
@@ -1634,7 +1644,7 @@ document.addEventListener("click", e=>{
     if(k==="loteSel"){ const l=loteById(v); if(l){ const same=f.loteId===v; f.loteId=same?"":v; f.lote=same?"":l.nombre; /* al cambiar de lote se actualiza el número que puso la app; si alguien lo escribió a mano, se respeta */
 const auto=(campo,v)=>{ f._auto=f._auto||{}; const cur=String(f[campo]??"").trim(); if(cur==="" || cur===f._auto[campo]){ f[campo]=v?String(v):""; f._auto[campo]=f[campo]; } };
 if(f.tipo==="sanidad") auto("cantidad", same?"":cabLote(l));
-if(f.tipo==="entore"){ auto("vientres", same?"":(vientresLote(l)||cabLote(l))); auto("toros", same?"":sumCats(l,x=>norm(x.nombre).includes("toro"))); } if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela"){ f.parcela=u.parcela; f.haParcela=u.haParcela!=null?String(u.haParcela):""; } } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+if(f.tipo==="entore"){ auto("vientres", same?"":(vientresLote(l)||cabLote(l))); auto("toros", same?"":sumCats(l,x=>norm(x.nombre).includes("toro")&&!norm(x.nombre).includes("rechazo"))); } if(!same){ const u=ubicLote(l); if(u.potrero&&!(f.tipo==="lote"&&f.movimiento==="ingreso")) f.potrero=u.potrero; if(f.tipo==="lote"&&u.parcela&&f.movimiento!=="parcela"){ f.parcela=u.parcela; f.haParcela=u.haParcela!=null?String(u.haParcela):""; } } } const y=window.scrollY; render(); window.scrollTo(0,y); return; }
     f[k] = (f[k]===v && !["sexo","estado","madreTipo","animalTipo","terneroTipo","categoria","resultado","valor","movimiento","mov","servicio"].includes(k)) ? "" : v;
     if(k==="resultado"&&f.tipo==="tacto"&&!S.editId){ guardarTactoCola(); return; }
     const y=window.scrollY; render(); window.scrollTo(0,y);
