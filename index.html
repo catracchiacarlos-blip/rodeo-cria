@@ -535,12 +535,16 @@ function formParto(f){
   ${masDatos(f)}`;
 }
 function potrerosRecientes(f){
-  // potreros de los lotes de Oficina (ubicación actual y potrero cargado en el lote) + los últimos usados en registros
+  // potreros de los lotes de Oficina (ubicación actual y potrero cargado en el lote), corrales y los últimos usados en registros
   const cmp=(a,b)=>String(a).localeCompare(String(b),"es",{numeric:true});
-  const deLotes=new Set(); lotesE().forEach(l=>{ const u=ubicLote(l); [u.potrero,l.potrero].forEach(x=>{ x=String(x||"").trim(); if(x) deLotes.add(x); }); });
-  const recientes=[...new Set(eventos().map(e=>String(e.potrero||"").trim()).filter(Boolean))].slice(-6).filter(x=>!deLotes.has(x));
-  const ps=[...[...deLotes].sort(cmp),...recientes.sort(cmp)];
-  return ps.length?`<div class="chips" style="margin:-6px 0 14px">${ps.map(p=>`<button type="button" class="chip ${f.potrero===p?"ok":""}" data-set="potrero" data-v="${esc(p)}">${esc(p)}</button>`).join("")}</div>`:"";
+  const vistos=new Map(), add=x=>{ x=String(x||"").trim().replace(/\s+/g," "); if(x&&!vistos.has(norm(x))) vistos.set(norm(x),x); };
+  lotesE().forEach(l=>{ const u=ubicLote(l); add(u.potrero); add(l.potrero); if(esCorral(l)&&!u.potrero&&!l.potrero) add(l.nombre); });
+  const evs=eventos().map(e=>String(e.potrero||"").trim()).filter(Boolean);
+  evs.filter(x=>/^corral\b/i.test(norm(x))).forEach(add);   // corrales escritos en registros: siempre
+  const fijos=[...vistos.values()].sort(cmp), n0=vistos.size;
+  [...new Set(evs)].slice(-6).forEach(add);
+  const ps=[...fijos,...[...vistos.values()].slice(n0).sort(cmp)];
+  return ps.length?`<div class="chips" style="margin:-6px 0 14px">${ps.map(p=>`<button type="button" class="chip ${norm(f.potrero)===norm(p)?"ok":""}" data-set="potrero" data-v="${esc(p)}">${esc(p)}</button>`).join("")}</div>`:"";
 }
 function lotePick(f){
   const L=lotesE(); if(!L.length) return "";
