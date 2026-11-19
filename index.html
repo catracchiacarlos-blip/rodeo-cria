@@ -226,7 +226,7 @@ const num = v => { if(v===""||v==null) return null; const n=parseFloat(String(v)
 const pct = (a,b) => b>0 ? a/b*100 : null;
 const f1 = v => v==null||isNaN(v) ? "—" : (Math.round(v*10)/10).toLocaleString("es-AR");
 const f0 = v => v==null||isNaN(v) ? "—" : Math.round(v).toLocaleString("es-AR");
-const APP_VER = "rc-v35";
+const APP_VER = "rc-v36";
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
 const slug = s => norm(s).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || uid();
 function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2600); }
@@ -796,6 +796,7 @@ function validar(f){
   if(f.tipo==="entore" && (f.movimiento||"inicio")==="inicio" && (f.servicio||"natural")==="natural" && !num(f.toros)) return "Faltan los toros que entran";
   if(f.tipo==="hacienda" && !f.mov) return "Elegí el movimiento";
   if(f.tipo==="hacienda" && !num(f.cabezas)) return "Faltan las cabezas";
+  if(f.tipo==="hacienda" && f.mov!=="lote" && !f.loteId && lotesE().length) return "Elegí el lote (de dónde salen o adónde entran)";
   if(f.tipo==="hacienda" && f.mov==="lote"){ if(!f.loteId) return "Elegí el lote de origen"; if(!f.loteDestId||f.loteDestId===f.loteId) return "Elegí el lote de destino"; if(!f.categoria) return "Elegí la categoría"; }
   if(f.tipo==="instal" && !f.bebida && !f.molino && !f.alambrado && !f.obs) return "Marcá al menos un control";
   return "";
@@ -1150,7 +1151,12 @@ function stockCalc(E){
   };
   const tsL=L.map(l=>l.stockTs).filter(Boolean).sort(), tsMin=tsL[0]||null;
   const sinFecha=L.filter(l=>!l.stockTs).map(l=>l.nombre);
+  const fuera=[], hace30=x=>{ const d=new Date(x.slice(0,10)+"T12:00"); d.setDate(d.getDate()-30); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  const cuenta=e=>(e.tipo==="muerte")||(e.tipo==="hacienda"&&(SALIDAS.includes(e.mov)||ENTRADAS.includes(e.mov)||e.mov==="lote"))||(e.tipo==="parto"&&e.estado!=="muerto");
   eventos().forEach(e=>{
+    if(cuenta(e)&&e.tipo!=="parto"){ const l0=L.find(x=>matchLote(e,x));
+      if(l0&&l0.stockTs&&!((e.fecha||"")>l0.stockTs)&&(e.fecha||"")>=hace30(l0.stockTs)) fuera.push({e,l:l0,motivo:"antes"});
+      else if(!l0&&e.mov!=="lote") fuera.push({e,l:null,motivo:"sinlote"}); }
     const t=e.tipo; let campo=null, n=0, cat=null;
     const l=L.find(x=>matchLote(e,x));
     if(t==="hacienda" && e.mov==="lote"){   // pase entre lotes: resta en el origen y suma en el destino (el total no cambia)
@@ -1173,7 +1179,7 @@ function stockCalc(E){
   const filas=Object.values(R).map(r=>({...r,actual:r.conteo+r.nac+r.ent-r.mue-r.sal})).filter(r=>r.conteo||r.nac||r.ent||r.mue||r.sal);
   const lotes=[...Object.values(Lr),...(SL.mas||SL.menos?[SL]:[])].map(x=>({...x,actual:x.conteo+x.mas-x.menos}));
   const tot=filas.reduce((a,r)=>a+r.actual,0), vientres=filas.filter(r=>r.c.vientre).reduce((a,r)=>a+r.actual,0), ev=filas.reduce((a,r)=>a+r.actual*(r.extra?1:catEv(r.c)),0);
-  return {filas,lotes,tot,vientres,ev,sinFecha,L};
+  return {filas,lotes,tot,vientres,ev,sinFecha,L,fuera};
 }
 /* cabezas actuales de cada lote en cada categoría (solo categorías con animales) */
 function stockMatriz(k){
@@ -1201,6 +1207,9 @@ function stockCard(){
     </tbody></table></div>`; })()}
     ${k.sinFecha.length?`<div class="banner" style="margin-top:8px">Sin fecha de conteo: ${k.sinFecha.map(esc).join(", ")}. A esos lotes se les suman y restan todos los movimientos cargados. Poné la fecha del conteo para contar solo lo cargado después.
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap"><input type="date" id="stk-fecha" value="${todayStr()}" style="max-width:200px"><button class="btn solid" data-stockfecha="1">Poner esta fecha a esos lotes</button></div></div>`:""}
+    ${k.fuera.length?`<div class="banner" style="margin-top:8px"><b>Movimientos que no descuentan de ningún lote (${k.fuera.length})</b>
+      <div class="list" style="margin-top:6px">${k.fuera.map(({e,l,motivo})=>`<div class="item"><span class="grow"><b>${e.tipo==="muerte"?"Muerte":(MOVS.find(m=>m[0]===e.mov)||["",e.mov])[1]} · ${f0(num(e.cabezas)||1)} cab${e.categoria?" "+esc(e.categoria):""}</b><span class="small muted" style="display:block">${fmtDT(e.fecha)}${e.destino?" · "+esc(e.destino):""} · ${motivo==="antes"?`cargado antes del conteo del lote ${esc(l.nombre)} (${fmtDT(l.stockTs)})`:"sin lote: baja el total pero no el lote"}</span></span>${motivo==="antes"?`<button class="chip ok" data-stkantes="${e.id}">Descontar</button>`:""}<button class="chip" data-edit="${e.id}">Editar</button></div>`).join("")}</div>
+      <p class="small muted" style="margin:6px 0 0">"Descontar" pasa la fecha del conteo del lote a justo antes del movimiento. Si el conteo ya lo tenía descontado, no lo toques. "Sin lote": tocá Editar y elegí el lote.</p></div>`:""}
     <p class="small muted" style="margin:8px 0 0">Actual = conteo del lote + nacimientos (partos vivos) + entradas − muertes − salidas cargadas después de la fecha del conteo. Al volver a contar, actualizá las cabezas del lote: la fecha del conteo pasa a ser ese día.</p>
     <button class="btn" data-share="stock" style="margin-top:10px">Copiar para WhatsApp</button></div>`;
 }
@@ -1569,7 +1578,9 @@ function guardarLote(){
   if($("#le-corral").checked) r.corral=true;
   const i=E.lotes.findIndex(x=>x.id===l.id), old=i>=0?E.lotes[i]:null, fIn=($("#le-fechastock").value||"");
   let ts=old&&old.stockTs||"";
-  if(!old || JSON.stringify(comp)!==JSON.stringify(old.comp||{})) ts = (fIn && fIn!==(old&&old.stockTs||"").slice(0,10) && fIn!==todayStr()) ? fIn+"T00:00" : nowLocal();
+  const oc=(old&&old.comp)||{}, compIgual=Object.keys({...comp,...oc}).every(k=>(num(comp[k])||0)===(num(oc[k])||0)), totIgual=old&&Object.values(comp).reduce((a,v)=>a+(num(v)||0),0)===Object.values(oc).reduce((a,v)=>a+(num(v)||0),0);
+  if(old && !compIgual && totIgual && !(fIn && fIn!==ts.slice(0,10))){ /* mismas cabezas repartidas en otras categorías: no es un conteo nuevo, la fecha queda */ }
+  else if(!old || !compIgual) ts = (fIn && fIn!==(old&&old.stockTs||"").slice(0,10) && fIn!==todayStr()) ? fIn+"T00:00" : nowLocal();
   else if(fIn && fIn!==ts.slice(0,10)) ts = fIn===todayStr() ? nowLocal() : fIn+"T00:00";
   if(ts) r.stockTs=ts;
   if(i>=0) E.lotes[i]=r; else E.lotes.push(r);
@@ -1723,6 +1734,9 @@ if(f.tipo==="entore"){ auto("vientres", same?"":(vientresLote(l)||cabLote(l))); 
   if(d.copyx){ S.copyTxt=null; render(); return; }
   if(d.ajok){ guardarAjustes(); return; }
   if(d.stockfecha){ const f=$("#stk-fecha").value; if(!f){ toast("Elegí la fecha"); return; } const E=estab(); let n=0; (E.lotes||[]).forEach(l=>{ if(!l.borrado&&!l.stockTs){ l.stockTs=f+"T00:00"; n++; } }); saveEstab(E); toast(`Fecha de conteo puesta a ${n} lote${n===1?"":"s"}`); const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+  if(d.stkantes){ const e=eventos().find(x=>x.id===d.stkantes); const E=estab(); const l=e&&(E.lotes||[]).find(x=>!x.borrado&&matchLote(e,x)); if(!l){ toast("No encuentro el lote"); return; }
+    const t=new Date((e.fecha||"").slice(0,16)); t.setMinutes(t.getMinutes()-1); l.stockTs=`${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    saveEstab(E); _stk={t:0,k:null}; toast(`Lote ${l.nombre}: conteo al ${fmtDT(l.stockTs)}`); const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(d.reintentar){ sync(); toast("Conectando…"); return; }
   if(d.metareset){ if(!confirm("¿Volver a las metas de base en este establecimiento?")) return; const E=estab(); E.metas={...METAS_BASE}; saveEstab(E); S.metasAbiertas=true; const y=window.scrollY; render(); window.scrollTo(0,y); toast("Metas de base"); return; }
   if(d.unlock){ desbloquear(d.unlock); return; }
