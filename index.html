@@ -778,15 +778,15 @@ function guardar(){
 /* ====================== claves por sección ====================== */
 const SECC = [["campo","Campo"],["manga","Manga"],["oficina","Oficina"]];
 const HOJAS = {
-  campo:[["parto","Parto"],["muerte","Muerte"],["novedad","Novedad"],["lote","Recorrida de lote"],["instal","Bebidas y molino"]],
-  manga:[["tacto","Tacto"],["ia","Inseminación"],["cc","Condición corporal"],["destete","Destete"],["pesada","Pesada"],["toro","Toros"],["entore","Entore"],["sanidad","Sanidad"],["hacienda","Entradas y salidas"]],
+  campo:[["parto","Parto"],["muerte","Muerte"],["novedad","Novedad"],["lote","Recorrida de lote"],["instal","Bebidas y molino"],["hacienda","Entradas y salidas"]],
+  manga:[["tacto","Tacto"],["ia","Inseminación"],["cc","Condición corporal"],["destete","Destete"],["pesada","Pesada"],["toro","Toros"],["entore","Entore"],["sanidad","Sanidad"]],
   oficina:[["resumen","Resumen"],["lotes","Lotes"],["indicadores","Indicadores"],["indices","Índices"],["calendario","Calendario"],["datos","Datos"],["ajustes","Ajustes"]]
 };
 const claves = (E=estab()) => E.claves||{};
 const seccDeHoja = h => Object.keys(HOJAS).find(s=>HOJAS[s].some(x=>x[0]===h));
 const nomHoja = (s,h) => ((HOJAS[s]||[]).find(x=>x[0]===h)||[])[1]||h;
 const nomSecc = s => (SECC.find(x=>x[0]===s)||[])[1]||s;
-const claveHoja = (s,h,C=claves()) => String((C.hojas||{})[s+"."+h]||"").trim();
+const claveHoja = (s,h,C=claves()) => String((C.hojas||{})[s+"."+h]||(s==="campo"&&h==="hacienda"?(C.hojas||{})["manga.hacienda"]:"")||"").trim();
 const unlE = () => S.unl[S.set.estab]||{};
 // el administrador (Carlos) abre todo en todos los campos, sin pedir la clave de cada uno
 function maestra(){ if(esAdmin()) return true; const ko=String(claves().oficina||"").trim(); return !!ko && unlE().oficina===ko; }
@@ -882,6 +882,7 @@ function renderHome(){
       <button class="big" data-new="novedad"><b>Novedad${lk("campo","novedad")}</b><span>Aguada, alambrado, enfermo…</span></button>
       <button class="big" data-new="lote"><b>Recorrida de lote${lk("campo","lote")}</b><span>Pastura, aguadas, entrada y salida</span></button>
       <button class="big" data-new="instal"><b>Bebidas y molino${lk("campo","instal")}</b><span>Bebidas, molino y alambrados</span></button>
+      <button class="big" data-new="hacienda"><b>Entradas y salidas${lk("campo","hacienda")}</b><span>Venta, refugo, compra, traslado</span></button>
     </div>
     ${lotesCampo()}
     <h2>Hoy</h2>
@@ -901,7 +902,6 @@ function renderHome(){
       <button class="big" data-new="toro"><b>Toros${lk("manga","toro")}</b><span>CE, aptitud, venéreas</span></button>
       <button class="big" data-new="entore"><b>Entore${lk("manga","entore")}</b><span>Entrada y salida de toros, IATF</span></button>
       <button class="big" data-new="sanidad"><b>Sanidad${lk("manga","sanidad")}</b><span>Vacuna o tarea del plan</span></button>
-      <button class="big" data-new="hacienda"><b>Entradas y salidas${lk("manga","hacienda")}</b><span>Venta, refugo, compra, traslado</span></button>
     </div>`;
   return renderOficina();
 }
@@ -1094,7 +1094,7 @@ function stockCalc(E){
     if(exacta){ const c=C.find(x=>norm(x.nombre)===norm(txt)); if(c) return c.id; }
     const k=claveCat[norm(txt)]||norm(txt).split(" ")[0]||"";
     let cs=C.filter(c=>k && norm(c.nombre).includes(k)); if(k==="vaca") cs=cs.filter(c=>!norm(c.nombre).includes("vaquill"));
-    if(!cs.length) return otra(txt);
+    if(!cs.length){ if(l){ const m=[...C].sort((a,b)=>val(l,b)-val(l,a))[0]; if(m&&val(l,m)) return m.id; } return otra(txt); }
     if(l) cs=[...cs].sort((a,b)=>val(l,b)-val(l,a));
     return cs[0].id;
   };
@@ -1103,7 +1103,8 @@ function stockCalc(E){
   eventos().forEach(e=>{
     const t=e.tipo; let campo=null, n=0, cat=null;
     const l=L.find(x=>matchLote(e,x));
-    const desde=l?l.stockTs:tsMin; if(!desde || !(e.fecha>desde)) return;   // solo lo cargado después del conteo
+    const desde=l?(l.stockTs||""):(tsMin||"");   // lote con fecha de conteo: solo lo cargado después; sin fecha: todo
+    if(desde && !((e.fecha||"")>desde)) return;
     if(t==="parto" && e.estado!=="muerto"){ campo="nac"; n=1; cat=catDe("ternero",l); }
     else if(t==="muerte"){ campo="mue"; n=num(e.cabezas)||1; cat=catDe(e.categoria||"",l); }
     else if(t==="hacienda" && (SALIDAS.includes(e.mov)||ENTRADAS.includes(e.mov))){ campo=SALIDAS.includes(e.mov)?"sal":"ent"; n=num(e.cabezas)||0; cat=catDe(e.categoria||"",l,true); }
@@ -1140,7 +1141,7 @@ function stockCard(){
       ${M.filas.map(f=>`<tr><td>${esc(f.x.l.nombre)}</td>${f.v.map(v=>`<td>${v?f0(v):""}</td>`).join("")}<td><b>${f0(f.x.actual)}</b></td></tr>`).join("")}
       <tr><td><b>Total</b></td>${M.cols.map(r=>`<td><b>${f0(r.actual)}</b></td>`).join("")}<td><b>${f0(k.tot)}</b></td></tr>
     </tbody></table></div>`; })()}
-    ${k.sinFecha.length?`<div class="banner" style="margin-top:8px">Sin fecha de conteo: ${k.sinFecha.map(esc).join(", ")}. A esos lotes no se les suman ni restan movimientos hasta que tengan la fecha del conteo.
+    ${k.sinFecha.length?`<div class="banner" style="margin-top:8px">Sin fecha de conteo: ${k.sinFecha.map(esc).join(", ")}. A esos lotes se les suman y restan todos los movimientos cargados. Poné la fecha del conteo para contar solo lo cargado después.
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap"><input type="date" id="stk-fecha" value="${todayStr()}" style="max-width:200px"><button class="btn solid" data-stockfecha="1">Poner esta fecha a esos lotes</button></div></div>`:""}
     <p class="small muted" style="margin:8px 0 0">Actual = conteo del lote + nacimientos (partos vivos) + entradas − muertes − salidas cargadas después de la fecha del conteo. Al volver a contar, actualizá las cabezas del lote: la fecha del conteo pasa a ser ese día.</p>
     <button class="btn" data-share="stock" style="margin-top:10px">Copiar para WhatsApp</button></div>`;
@@ -1435,10 +1436,10 @@ function renderIndices(){
   ${G("Carga, producción y stock",
     R("Carga",f1(k.evHa)," EV/ha","EV de los lotes de cría ÷ (superficie ganadera − corrales)","","",F(k.ha&&k.evHa,"lotes con cabezas y superficie"))+
     R("Carga en cabezas",f1(k.cabHa)," cab/ha","Cabezas de los lotes de cría ÷ (superficie ganadera − corrales)","","","")+
-    R("Producción de carne",f0(k.prodHa)," kg/ha","(Kg cierre + vendidos − comprados − kg inicio + consumo) ÷ ha","","",F(k.prod!=null,"kg en stock al inicio y al cierre")+F(k.hz,"ventas y compras (Manga → Entradas y salidas)"))+
+    R("Producción de carne",f0(k.prodHa)," kg/ha","(Kg cierre + vendidos − comprados − kg inicio + consumo) ÷ ha","","",F(k.prod!=null,"kg en stock al inicio y al cierre")+F(k.hz,"ventas y compras (Campo → Entradas y salidas)"))+
     R("Eficiencia de stock",f1(k.efStock),"%","Producción de carne ÷ stock medio en kg","","",F(k.prod!=null,"kg en stock al inicio y al cierre"))+
-    R("Extracción",f1(k.extr),"%","Cabezas vendidas (venta + refugo) ÷ cabezas al inicio","","",F(k.hz,"ventas y refugos (Manga → Entradas y salidas)"))+
-    R("Refugo",f1(k.refugo),"%","Vacas de refugo ÷ vientres entorados","","",F(k.hz,"refugos (Manga → Entradas y salidas)"))+
+    R("Extracción",f1(k.extr),"%","Cabezas vendidas (venta + refugo) ÷ cabezas al inicio","","",F(k.hz,"ventas y refugos (Campo → Entradas y salidas)"))+
+    R("Refugo",f1(k.refugo),"%","Vacas de refugo ÷ vientres entorados","","",F(k.hz,"refugos (Campo → Entradas y salidas)"))+
     R("Reposición",f1(k.repos),"%","Vaquillonas entoradas ÷ vientres entorados","","",F(num(cfg.vaquillonas),"vaquillonas entoradas")))}
   ${editorMetas()}
   <div class="card" id="datos-camp"><h3 style="margin-top:0">Datos de la campaña ${c}/${String(c+1).slice(2)} (se cargan en la compu)</h3>
