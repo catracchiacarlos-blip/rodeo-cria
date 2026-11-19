@@ -535,7 +535,11 @@ function formParto(f){
   ${masDatos(f)}`;
 }
 function potrerosRecientes(f){
-  const ps=[...new Set(eventos().map(e=>e.potrero).filter(Boolean))].slice(-6);
+  // potreros de los lotes de Oficina (ubicación actual y potrero cargado en el lote) + los últimos usados en registros
+  const cmp=(a,b)=>String(a).localeCompare(String(b),"es",{numeric:true});
+  const deLotes=new Set(); lotesE().forEach(l=>{ const u=ubicLote(l); [u.potrero,l.potrero].forEach(x=>{ x=String(x||"").trim(); if(x) deLotes.add(x); }); });
+  const recientes=[...new Set(eventos().map(e=>String(e.potrero||"").trim()).filter(Boolean))].slice(-6).filter(x=>!deLotes.has(x));
+  const ps=[...[...deLotes].sort(cmp),...recientes.sort(cmp)];
   return ps.length?`<div class="chips" style="margin:-6px 0 14px">${ps.map(p=>`<button type="button" class="chip ${f.potrero===p?"ok":""}" data-set="potrero" data-v="${esc(p)}">${esc(p)}</button>`).join("")}</div>`:"";
 }
 function lotePick(f){
