@@ -189,7 +189,7 @@ function editorMetas(){
   const E=estab(), M=metasE(E), grupos=[...new Set(METAS_DEF.map(x=>x[3]))];
   return `<details class="card" id="metas" ${S.metasAbiertas?"open":""}><summary><b>Metas de ${esc(E.nombre)}</b> · editar</summary>
     <p class="small muted">Contra estas metas se pintan los indicadores y los índices (verde, amarillo o rojo). Son de este establecimiento. Vacío = vuelve a la meta de base.</p>
-    ${grupos.map(g=>`<div class="lbl" style="margin:10px 0 4px">${g}</div><div class="row2">${METAS_DEF.filter(x=>x[3]===g).map(([k,n,u])=>fld(`${n} (${u})`,`<input type="number" inputmode="decimal" step="any" data-meta="${k}" value="${M[k]??""}" placeholder="${METAS_BASE[k]}">`)).join("")}</div>`).join("")}
+    ${grupos.map(g=>`<div class="lbl" style="margin:10px 0 4px">${g}</div><div class="row2">${METAS_DEF.filter(x=>x[3]===g).map(([k,n,u])=>fld(`${n} (${u})`,`<input type="text" inputmode="decimal" autocomplete="off" data-meta="${k}" value="${M[k]??""}" placeholder="${METAS_BASE[k]}">`)).join("")}</div>`).join("")}
     <button class="btn" data-metareset="1" style="margin-top:8px">Volver a las metas de base</button></details>`;
 }
 
@@ -1384,8 +1384,8 @@ function renderIndices(){
   <div class="card" id="datos-camp"><h3 style="margin-top:0">Datos de la campaña ${c}/${String(c+1).slice(2)} (se cargan en la compu)</h3>
     <div class="row2">${fld("Vacas entoradas",`<input type="number" inputmode="numeric" data-camp="vacas" value="${cfg.vacas??""}">`)}${fld("Vaquillonas entoradas",`<input type="number" inputmode="numeric" data-camp="vaquillonas" value="${cfg.vaquillonas??""}">`)}</div>
     <div class="row2">${fld("Toros en servicio",`<input type="number" inputmode="numeric" data-camp="toros" value="${cfg.toros??""}">`)}${fld("Inicio del entore",`<input type="date" data-camp="inicio" value="${cfg.inicio??""}">`)}</div>
-    <div class="row2">${fld("Kg en stock al inicio",`<input type="number" inputmode="decimal" data-camp="kgIni" value="${cfg.kgIni??""}">`)}${fld("Kg en stock al cierre",`<input type="number" inputmode="decimal" data-camp="kgFin" value="${cfg.kgFin??""}">`)}</div>
-    <div class="row2">${fld("Cabezas al inicio",`<input type="number" inputmode="numeric" data-camp="cabIni" value="${cfg.cabIni??""}" placeholder="Si no, suma de lotes">`)}${fld("Peso adulto de las vacas (kg)",`<input type="number" inputmode="decimal" data-camp="pesoVaca" value="${cfg.pesoVaca??""}" placeholder="Si no, pesadas de vacas">`)}</div>
+    <div class="row2">${fld("Kg en stock al inicio",`<input type="text" inputmode="decimal" autocomplete="off" data-camp="kgIni" value="${cfg.kgIni??""}">`)}${fld("Kg en stock al cierre",`<input type="text" inputmode="decimal" autocomplete="off" data-camp="kgFin" value="${cfg.kgFin??""}">`)}</div>
+    <div class="row2">${fld("Cabezas al inicio",`<input type="number" inputmode="numeric" data-camp="cabIni" value="${cfg.cabIni??""}" placeholder="Si no, suma de lotes">`)}${fld("Peso adulto de las vacas (kg)",`<input type="text" inputmode="decimal" autocomplete="off" data-camp="pesoVaca" value="${cfg.pesoVaca??""}" placeholder="Si no, pesadas de vacas">`)}</div>
     <span class="small muted">Lo demás sale de lo que se carga a campo (partos, muertes, recorridas) y en manga (tacto, CC, destete, pesadas, entradas y salidas). La superficie y las cabezas salen de Oficina → Lotes.</span>
   </div>
   <p class="small muted">La campaña va del entore (octubre) en adelante: tacto, parición, destete y las ventas de ese ciclo.</p>
@@ -1401,8 +1401,8 @@ function renderLotes(){
   const haTxt=ha?"en lotes de cría":(haGan?"sobre sup. de cría":"");
   return `<h1>Campo y lotes</h1>
   <p class="small muted">Lo que cargues acá lo ven los operarios en la pantalla Campo. Los indicadores por lote se calculan sobre estas cabezas. Los lotes marcados como corral / encierre no entran en la carga ni en la superficie de cría.</p>
-  <div class="card"><div class="row2">${fld("Superficie total (ha)",`<input type="number" inputmode="decimal" data-estf="superficie" value="${E.superficie??""}">`)}${fld("Superficie ganadera (ha)",`<input type="number" inputmode="decimal" data-estf="superficieGan" value="${E.superficieGan??""}">`)}</div>
-  ${fld("Superficie de corrales / encierre (ha)",`<input type="number" inputmode="decimal" data-estf="superficieCorr" value="${E.superficieCorr??""}" placeholder="Opcional">`,"Se descuenta de la superficie ganadera: lo que queda es la superficie de cría.")}
+  <div class="card"><div class="row2">${fld("Superficie total (ha)",`<input type="text" inputmode="decimal" autocomplete="off" data-estf="superficie" value="${E.superficie??""}">`)}${fld("Superficie ganadera (ha)",`<input type="text" inputmode="decimal" autocomplete="off" data-estf="superficieGan" value="${E.superficieGan??""}">`)}</div>
+  ${fld("Superficie de corrales / encierre (ha)",`<input type="text" inputmode="decimal" autocomplete="off" data-estf="superficieCorr" value="${E.superficieCorr??""}" placeholder="Opcional">`,"Se descuenta de la superficie ganadera: lo que queda es la superficie de cría.")}
   ${haGan?`<p class="small muted" style="margin:4px 0 0">Superficie de cría: <b>${f1(haGan)} ha</b></p>`:""}</div>
   <div class="kpis">
     <div class="kpi"><span>Lotes</span><b>${L.length}</b>${LK.length?`<small>${LK.length} de corral</small>`:""}</div>
@@ -1416,7 +1416,7 @@ function renderLotes(){
     <button class="btn solid block" data-lnew="1" style="margin-top:10px">Agregar lote</button></div>`}
   <details class="card"><summary>Categorías del rodeo</summary>
     <p class="small muted">Se usan para cargar las cabezas de cada lote. Marcá las que cuentan como vientre para el % de parición. EV = equivalente vaca de cada categoría, para la carga en EV/ha.</p>
-    ${catsE(E).map(c=>`<div class="item"><input type="text" data-catn="${c.id}" value="${esc(c.nombre)}" style="flex:1"><label class="small" style="display:flex;gap:4px;align-items:center;white-space:nowrap">EV <input type="number" inputmode="decimal" step="0.05" data-catev="${c.id}" value="${catEv(c)}" style="width:76px;min-height:40px;padding:6px"></label><label class="small" style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input type="checkbox" data-catv="${c.id}" ${c.vientre?"checked":""}> Vientre</label><button class="chip bad" data-catdel="${c.id}">Quitar</button></div>`).join("")}
+    ${catsE(E).map(c=>`<div class="item"><input type="text" data-catn="${c.id}" value="${esc(c.nombre)}" style="flex:1"><label class="small" style="display:flex;gap:4px;align-items:center;white-space:nowrap">EV <input type="text" inputmode="decimal" autocomplete="off" data-catev="${c.id}" value="${String(catEv(c)).replace(".",",")}" style="width:76px;min-height:40px;padding:6px"></label><label class="small" style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input type="checkbox" data-catv="${c.id}" ${c.vientre?"checked":""}> Vientre</label><button class="chip bad" data-catdel="${c.id}">Quitar</button></div>`).join("")}
     <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="cat-nuevo" placeholder="Nueva categoría (ej. vacas de refugo)"><button class="btn" data-catadd="1">Agregar</button></div>
   </details>
   ${L.length?`<h2>Indicadores por lote</h2>
@@ -1431,8 +1431,8 @@ function formLoteEd(l){
     ${fld("Nombre del lote",`<input type="text" id="le-nombre" value="${esc(l.nombre||"")}" placeholder="Ej. Vacas 1° servicio">`)}
     <label class="small" style="display:flex;gap:8px;align-items:center;margin:4px 0 10px"><input type="checkbox" id="le-corral" ${l.corral?"checked":""} style="width:22px;height:22px"> Lote de corral / encierre (no cuenta en la carga ni en la superficie de cría)</label>
     <div class="row2">${fld("Potrero",`<input type="text" id="le-potrero" value="${esc(l.potrero||"")}">`)}${fld("Parcela",`<input type="text" id="le-parcela" value="${esc(l.parcela||"")}" placeholder="Opcional">`)}</div>
-    <div class="row2">${fld("Ha del lote",`<input type="number" inputmode="decimal" id="le-ha" value="${l.ha??""}">`)}${fld("Ha de la parcela",`<input type="number" inputmode="decimal" id="le-haparcela" value="${l.haParcela??""}" placeholder="Opcional">`)}</div>
-    <div class="row2">${fld("Tipo de pastura",`<input type="text" id="le-pastura" list="dl-pasturas" value="${esc(l.pastura||"")}" placeholder="Elegí o escribí"><datalist id="dl-pasturas">${PASTURAS.map(x=>`<option value="${x}">`).join("")}</datalist>`)}${fld("Carga posible (cab/ha)",`<input type="number" inputmode="decimal" id="le-cargamax" value="${l.cargaMax??""}">`)}</div>
+    <div class="row2">${fld("Ha del lote",`<input type="text" inputmode="decimal" autocomplete="off" id="le-ha" value="${l.ha??""}">`)}${fld("Ha de la parcela",`<input type="text" inputmode="decimal" autocomplete="off" id="le-haparcela" value="${l.haParcela??""}" placeholder="Opcional">`)}</div>
+    <div class="row2">${fld("Tipo de pastura",`<input type="text" id="le-pastura" list="dl-pasturas" value="${esc(l.pastura||"")}" placeholder="Elegí o escribí"><datalist id="dl-pasturas">${PASTURAS.map(x=>`<option value="${x}">`).join("")}</datalist>`)}${fld("Carga posible (cab/ha)",`<input type="text" inputmode="decimal" autocomplete="off" id="le-cargamax" value="${l.cargaMax??""}">`)}</div>
     ${fld("Aguadas",`<input type="text" id="le-aguadas" value="${esc(l.aguadas||"")}" placeholder="Ej. molino y 2 bebederos">`)}
     <div class="row2">${fld("Fecha de entrada",`<input type="date" id="le-ingreso" value="${l.ingreso||""}">`)}${fld("Salida prevista",`<input type="date" id="le-salida" value="${l.salida||""}">`)}</div>
     <div class="lbl" style="margin:6px 0">Cabezas por categoría</div>
@@ -1659,7 +1659,7 @@ document.addEventListener("change", e=>{
   if(t.id==="sel-estab"){ S.set.estab=t.value; S.filt=null; S.why=null; S.loteF=null; persist(); render(); return; }
   if(d.f && S.f){ S.f[d.f]=t.value; if(d.f==="tarea"||(d.f==="cabezas"&&S.f.tipo==="muerte")||(S.f.tipo==="entore"&&(d.f==="toros"||d.f==="vientres"))){ const y=window.scrollY; render(); window.scrollTo(0,y); } return; }
   if(d.filt){ S.filt[d.filt]=t.value; S.why=null; render(); return; }
-  if(d.camp){ const E=estab(); E.campanas[S.campSel]=E.campanas[S.campSel]||{}; E.campanas[S.campSel][d.camp]=t.type==="number"?num(t.value):t.value; saveEstab(E); render(); return; }
+  if(d.camp){ const E=estab(); E.campanas[S.campSel]=E.campanas[S.campSel]||{}; E.campanas[S.campSel][d.camp]=(t.type==="number"||t.inputMode==="decimal")?num(t.value):t.value; saveEstab(E); render(); return; }
   if(d.catev){ const E=estab(); E.cats=JSON.parse(JSON.stringify(catsE(E))); const c=E.cats.find(x=>x.id===d.catev); if(c){ c.ev=num(t.value); saveEstab(E); } render(); return; }
   if(d.catn||d.catv){ const E=estab(); E.cats=JSON.parse(JSON.stringify(catsE(E))); const c=E.cats.find(x=>x.id===(d.catn||d.catv)); if(c){ if(d.catn){ const v=t.value.trim(); if(v) c.nombre=v; } else c.vientre=t.checked; saveEstab(E); } render(); return; }
   if(d.lper){ S.loteP[d.lper]=t.value; render(); return; }
