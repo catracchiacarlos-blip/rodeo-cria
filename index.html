@@ -777,7 +777,8 @@ const nomHoja = (s,h) => ((HOJAS[s]||[]).find(x=>x[0]===h)||[])[1]||h;
 const nomSecc = s => (SECC.find(x=>x[0]===s)||[])[1]||s;
 const claveHoja = (s,h,C=claves()) => String((C.hojas||{})[s+"."+h]||"").trim();
 const unlE = () => S.unl[S.set.estab]||{};
-function maestra(){ const ko=String(claves().oficina||"").trim(); return !!ko && unlE().oficina===ko; }
+// el administrador (Carlos) abre todo en todos los campos, sin pedir la clave de cada uno
+function maestra(){ if(esAdmin()) return true; const ko=String(claves().oficina||"").trim(); return !!ko && unlE().oficina===ko; }
 function seccLibre(tab){ const k=String(claves()[tab]||"").trim(); if(!k) return true; return unlE()[tab]===k || maestra(); }
 function hojaAbierta(s,h){ const k=claveHoja(s,h); if(!k) return seccLibre(s); return maestra() || unlE()["h:"+s+"."+h]===k; }
 // a la sección se entra con su clave, con la maestra o con la clave de alguna de sus hojas
@@ -1555,7 +1556,7 @@ function nuevoCampo(){
 }
 function editorClaves(E){
   const C=claves(E), ko=String(C.oficina||"").trim();
-  if(!esCompu()) return `<p class="small" style="margin-top:0">Las claves se cargan y se cambian <b>desde la computadora</b>: abrí el mismo link en la compu → Oficina → Ajustes.</p>`;
+  if(!esCompu() && !esAdmin()) return `<p class="small" style="margin-top:0">Las claves se cargan y se cambian <b>desde la computadora</b>: abrí el mismo link en la compu → Oficina → Ajustes.</p>`;
   if(ko && !maestra()) return `<p class="small" style="margin-top:0">Para ver y cambiar las claves entrá con la clave de Oficina.</p>`;
   return `<p class="small muted" style="margin-top:0">La app abre sin clave: la clave se pide recién al entrar a una hoja. Clave de una hoja: con clave, solo entra quien la tenga; vacía = usa la de su sección (si la sección también está vacía, la hoja queda libre). La clave de Oficina abre todo y es la única que deja cambiar las claves: cargala primero.</p>
     ${SECC.map(([s,l])=>`<div class="kblock"><div class="kh">${fld(`Sección ${l}`,`<input type="text" data-clave="${s}" value="${esc(C[s]||"")}" autocapitalize="off" autocomplete="off" placeholder="Libre">`)}</div>
