@@ -226,7 +226,7 @@ const num = v => { if(v===""||v==null) return null; const n=parseFloat(String(v)
 const pct = (a,b) => b>0 ? a/b*100 : null;
 const f1 = v => v==null||isNaN(v) ? "—" : (Math.round(v*10)/10).toLocaleString("es-AR");
 const f0 = v => v==null||isNaN(v) ? "—" : Math.round(v).toLocaleString("es-AR");
-const APP_VER = "rc-v38";
+const APP_VER = "rc-v39";
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
 const slug = s => norm(s).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || uid();
 function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2600); }
@@ -810,6 +810,7 @@ function validar(f){
   if(f.tipo==="entore" && (f.movimiento||"inicio")==="inicio" && (f.servicio||"natural")==="natural" && !num(f.toros)) return "Faltan los toros que entran";
   if(f.tipo==="hacienda" && !f.mov) return "Elegí el movimiento";
   if(f.tipo==="hacienda" && !num(f.cabezas)) return "Faltan las cabezas";
+  if(f.tipo==="hacienda" && !f.categoria && catsE().length) return "Elegí la categoría (para descontarla o sumarla en el stock)";
   if(f.tipo==="hacienda" && f.mov!=="lote" && !f.loteId && lotesE().length) return "Elegí el lote (de dónde salen o adónde entran)";
   if(f.tipo==="hacienda" && f.mov==="lote"){ if(!f.loteId) return "Elegí el lote de origen"; if(!f.loteDestId||f.loteDestId===f.loteId) return "Elegí el lote de destino"; if(!f.categoria) return "Elegí la categoría"; }
   if(f.tipo==="instal" && !f.bebida && !f.molino && !f.alambrado && !f.obs) return "Marcá al menos un control";
