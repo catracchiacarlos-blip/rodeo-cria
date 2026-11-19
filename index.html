@@ -340,6 +340,17 @@ function estab(){
   return r;
 }
 function saveEstab(r){ r.detalle = r.nombre; put(r); }
+// pedido de Carlos (19/11/2026): sacar todas las claves de El Grillo. Se hace una sola vez: solo si la configuración del campo
+// es de antes de esa fecha, así las claves que se carguen de nuevo después no se borran.
+const LIMPIAR_CLAVES = { "agropecuaria-del-grillo": 1795116900000 };
+function limpiarClaves(){
+  Object.entries(LIMPIAR_CLAVES).forEach(([id,hasta])=>{
+    const r=estabRec(id); if(!r || !r.claves || (r.actualizadoLocal||0)>=hasta) return;
+    const C=r.claves, hay=Object.entries(C).some(([k,v])=> k==="hojas" ? Object.keys(v||{}).length : String(v||"").trim());
+    if(!hay) return;
+    r.claves={hojas:{}}; saveEstab(r);
+  });
+}
 const campoNombre = id => ((S.set.campos||[]).find(c=>c.estab===id)||{}).nombre;
 const listaEstabs = () => { const m={}; if(esAdmin()) (S.set.campos||[]).forEach(c=>m[c.estab]=c.nombre); else if(S.set.rol==="campo"){ return {[S.set.estab]:estab().nombre}; } Object.values(S.R).filter(r=>r.tipo==="estab"&&!r.borrado).forEach(r=>m[r.estab]=r.nombre); if(S.set.estab && !m[S.set.estab]) m[S.set.estab]=estab().nombre; if(!Object.keys(m).length) m[ESTAB_DEFAULT.id]=ESTAB_DEFAULT.nombre; return m; };
 
@@ -417,7 +428,7 @@ async function sync(){
       chunk.forEach(id=>{ const x=S.R[id]; if(x && x.clase==="config") S.base[id]=JSON.parse(JSON.stringify(x)); if(x && x.actualizadoLocal===vers[id]) delete S.outbox[id]; });
     }
     S.syncState="ok"; S.syncErr=""; S.codMal=false;
-    registrarUsuario();
+    registrarUsuario(); limpiarClaves();
     persist();
     if(!S.f && S.view!=="setup") renderSiSePuede();
   }catch(e){
