@@ -1556,23 +1556,32 @@ async function compartirArch(file,titulo){
   catch(err){ if(err&&err.name==="AbortError") return "cancel"; errComp=(err&&(err.name+": "+err.message))||"error"; console.error(err); return "error"; }
 }
 /* hoja con botones: el toque nuevo del usuario habilita compartir aunque armar el PDF haya tardado */
+/* Samsung Internet (y otros) rechazan compartir archivos: ahí va "Descargar + Abrir WhatsApp" */
+const shareBloq=()=>{ try{ return localStorage.getItem("rc-share-bloq")==="1"; }catch(_){ return false; } };
+const marcarBloq=()=>{ try{ localStorage.setItem("rc-share-bloq","1"); }catch(_){} };
 function hojaCompartir(file,blob,titulo,puede){
   cerrarHoja();
+  const directo=puede&&!shareBloq(), ext=file.name.split(".").pop().toUpperCase();
   const h=document.createElement("div"); h.id="hojaComp";
+  const pasos=`<button class="btn solid hc-wa" data-hc="dl">1 · Descargar ${ext}</button>
+    <a class="btn solid hc-wa" data-hc="wa" href="whatsapp://send" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">2 · Abrir WhatsApp</a>
+    <div class="muted" style="font-size:13px;line-height:1.4">En WhatsApp elegí el chat → clip 📎 → <b>Documento</b>: el archivo aparece primero en la lista.${/SamsungBrowser/.test(navigator.userAgent)?" (El navegador de Samsung no deja mandarlo directo; desde Chrome sale con un solo toque.)":""}</div>`;
   h.innerHTML=`<div class="hc-fondo" data-hc="x"></div><div class="hc-caja">
-    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo <span class="muted" style="font-size:11px;font-weight:400">v46</span></b>
+    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo <span class="muted" style="font-size:11px;font-weight:400">v47</span></b>
     <div class="muted" style="font-size:13px;margin-bottom:12px;word-break:break-word">${esc(file.name)}</div>
-    ${puede?`<button class="btn solid hc-wa" data-hc="share">Compartir por WhatsApp</button>`:`<div class="muted" style="font-size:13px;margin-bottom:10px">Este navegador no deja mandar archivos directo. Descargalo y en WhatsApp tocá el clip → Documento.${navInterno()?` Si abriste la app desde WhatsApp, abrila en ${esIOS()?"Safari":"Chrome"} para compartir directo.`:""}</div>`}
+    <div class="hc-cuerpo" style="display:flex;flex-direction:column;gap:10px">${directo?`<button class="btn solid hc-wa" data-hc="share">Compartir por WhatsApp</button><button class="btn" data-hc="dl">Descargar</button>`:pasos}</div>
     <div class="hc-info" hidden style="background:#FFF4D6;color:#5a4300;border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.35"></div>
-    <button class="btn" data-hc="dl">Descargar</button>
-    ${puede?"":`<a class="btn" href="https://wa.me/" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">Abrir WhatsApp</a>`}
     <button class="btn hc-x" data-hc="x">Cerrar</button></div>`;
+  const dl=k=>{ descargarArch(blob,file.name); if(k){ k.textContent="✓ Descargado (en Descargas)"; k.classList.remove("solid","hc-wa"); } };
   h.addEventListener("click",async ev=>{ const k=ev.target.closest("[data-hc]"); if(!k) return; const a=k.dataset.hc;
     if(a==="x") return cerrarHoja();
+    if(a==="wa") return;   // el link abre WhatsApp
     const info=h.querySelector(".hc-info");
-    if(a==="dl"){ try{ descargarArch(blob,file.name); k.textContent="✓ Descargado"; info.innerHTML=`Quedó en la carpeta <b>Descargas</b> del celular. En WhatsApp: clip → Documento → buscalo ahí.`; }catch(err){ info.textContent="No se pudo descargar: "+(err&&err.message||err); } info.hidden=false; return; }
+    if(a==="dl"){ try{ dl(k); }catch(err){ info.textContent="No se pudo descargar: "+(err&&err.message||err); info.hidden=false; } return; }
     if(a==="share"){ k.textContent="Abriendo…"; const r=await compartirArch(file,titulo); k.textContent="Compartir por WhatsApp";
-      if(r==="ok") cerrarHoja(); else if(r==="error"){ info.innerHTML=`<b>No se pudo compartir.</b> Tocá Descargar.<br><small>${esc(errComp)} · ${esc(diagNav())}</small>`; info.hidden=false; } } });
+      if(r==="ok") return cerrarHoja();
+      if(r==="error"){ marcarBloq(); const c=h.querySelector(".hc-cuerpo"); c.innerHTML=pasos; try{ dl(c.querySelector('[data-hc="dl"]')); }catch(_){}
+        info.innerHTML=`Este navegador no deja mandar el archivo directo, así que ya lo descargué. Tocá <b>Abrir WhatsApp</b>.<br><small>${esc(errComp)} · ${esc(diagNav())}</small>`; info.hidden=false; } } });
   document.body.appendChild(h);
 }
 const diagNav=()=>`${(matchMedia("(display-mode: standalone)").matches?"app instalada":"navegador")} · ${(navigator.userAgent.match(/(SamsungBrowser|EdgA|Firefox|OPR|Chrome|Version)\/[\d]+/)||[""])[0]}${navInterno()?" · webview":""}`;
@@ -1587,7 +1596,7 @@ async function compartirInforme(key,fmt){
     const puede=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}));
     $("#toast").hidden=true;
     /* si el toque sigue vigente, abre directo el menú de compartir; si no, muestra el botón */
-    if(puede&&(!navigator.userActivation||navigator.userActivation.isActive)){
+    if(puede&&!shareBloq()&&(!navigator.userActivation||navigator.userActivation.isActive)){
       const r=await compartirArch(file,titulo); if(r!=="error") return;
     }
     hojaCompartir(file,blob,titulo,puede);
