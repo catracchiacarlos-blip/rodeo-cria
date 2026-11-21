@@ -117,6 +117,41 @@ details summary{cursor:pointer;font-weight:600;color:var(--brand2);padding:6px 0
 .eid{font-family:ui-monospace,Menlo,monospace;font-size:14px}
 svg text{font-family:system-ui,sans-serif}
 [hidden]{display:none!important}
+#pdf{display:none}
+@media print{
+  @page{size:A4;margin:12mm}
+  html,body{background:#fff!important}
+  body.imprimiendo > *:not(#pdf){display:none!important}
+  body.imprimiendo #pdf{display:block}
+}
+#pdf{font:10.5pt/1.4 "Segoe UI",Roboto,Arial,sans-serif;color:#1B2E30;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#pdf .ph{background:#063537;color:#fff;padding:12px 16px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+#pdf .logo{display:flex;align-items:center;gap:10px}
+#pdf .iso{width:30px;height:30px;border-radius:50%;background:#17BEBB;display:inline-block;position:relative}
+#pdf .iso:after{content:"";position:absolute;left:8px;top:8px;width:14px;height:14px;border-radius:50%;background:#063537}
+#pdf .logo b{font-size:20pt;letter-spacing:.04em;line-height:1}
+#pdf .logo .v{color:#17BEBB}
+#pdf .ph small{display:block;color:#A8DCDA;font-size:8.5pt;font-weight:400;letter-spacing:0}
+#pdf .ph .r{text-align:right}
+#pdf .ph .r b{font-size:12pt}
+#pdf .bar{height:4px;background:#17BEBB;margin:5px 0 12px;border-radius:2px}
+#pdf h1{color:#063537;font-size:15pt;margin:0 0 4px}
+#pdf .sub{color:#5E7273;margin:0 0 10px}
+#pdf h2{color:#063537;font-size:11.5pt;border-bottom:2px solid #17BEBB;padding-bottom:2px;margin:14px 0 6px}
+#pdf p{margin:4px 0}
+#pdf table{width:100%;border-collapse:collapse;font-size:9.5pt;margin:4px 0 8px}
+#pdf th,#pdf td{text-align:left!important;text-transform:none!important;letter-spacing:0!important;white-space:normal!important}
+#pdf th{background:#063537;color:#fff;padding:5px 6px;font-weight:600;font-size:9pt}
+#pdf td{padding:4px 6px;border-bottom:1px solid #D9E3E1;vertical-align:top}
+#pdf tr:nth-child(even) td{background:#EEF7F6}
+#pdf tr.tot td{background:#DDF3F2;font-weight:700}
+#pdf tr{break-inside:avoid}
+#pdf .kv td:first-child{color:#5E7273;width:42%}
+#pdf .kpis{display:flex;gap:8px;margin:6px 0 10px;flex-wrap:wrap}
+#pdf .kpis div{flex:1;min-width:90px;border:1px solid #D9E3E1;border-top:3px solid #17BEBB;border-radius:4px;padding:6px 8px}
+#pdf .kpis span{display:block;color:#5E7273;font-size:8.5pt}
+#pdf .kpis b{font-size:14pt;color:#063537}
+#pdf .foot{margin-top:16px;border-top:1px solid #D9E3E1;padding-top:5px;color:#5E7273;font-size:8pt;display:flex;justify-content:space-between}
 </style>
 </head>
 <body>
@@ -197,7 +232,8 @@ const TIPOS = {
   parto:{n:"Parto",pl:"Partos"}, muerte:{n:"Muerte",pl:"Muertes"}, novedad:{n:"Novedad",pl:"Novedades"}, pedido:{n:"Pedido",pl:"Pedidos"},
   tacto:{n:"Tacto",pl:"Tactos"}, ia:{n:"Inseminación",pl:"Inseminaciones"}, toro:{n:"Revisación de toro",pl:"Toros revisados"}, cc:{n:"Condición corporal",pl:"Registros de CC"},
   sanidad:{n:"Sanidad / tarea",pl:"Sanidad y tareas"}, destete:{n:"Destete",pl:"Destetes"}, pesada:{n:"Pesada",pl:"Pesadas"},
-  lote:{n:"Recorrida y novedades",pl:"Recorridas y novedades"}, entore:{n:"Entore",pl:"Entores"}, hacienda:{n:"Entrada/salida de hacienda",pl:"Entradas y salidas de hacienda"}, instal:{n:"Bebidas, molino y alambrados",pl:"Controles de instalaciones"}
+  lote:{n:"Recorrida y novedades",pl:"Recorridas y novedades"}, entore:{n:"Entore",pl:"Entores"}, hacienda:{n:"Entrada/salida de hacienda",pl:"Entradas y salidas de hacienda"}, instal:{n:"Bebidas, molino y alambrados",pl:"Controles de instalaciones"},
+  recuento:{n:"Recuento de hacienda",pl:"Recuentos de hacienda"}
 };
 const CATS_BASE = [{id:"vacasPre",nombre:"Vacas preñadas",vientre:true,ev:1},{id:"vacasVac",nombre:"Vacas vacías",ev:0.85},{id:"vacasCria",nombre:"Vacas con cría",ev:1},{id:"vaqPre",nombre:"Vaquillonas preñadas",vientre:true,ev:0.9},{id:"vaq",nombre:"Vaquillonas",ev:0.7},{id:"terneros",nombre:"Terneros/as",ev:0.4},{id:"toros",nombre:"Toros",ev:1.3},{id:"vaqRech",nombre:"Vaquillona rechazo",ev:0.7},{id:"vacaRech",nombre:"Vaca rechazo",ev:0.85},{id:"toroRech",nombre:"Toro rechazo",ev:1.3}];
 const CATS_RECH = ["vaqRech","vacaRech","toroRech"];
@@ -226,7 +262,7 @@ const num = v => { if(v===""||v==null) return null; const n=parseFloat(String(v)
 const pct = (a,b) => b>0 ? a/b*100 : null;
 const f1 = v => v==null||isNaN(v) ? "—" : (Math.round(v*10)/10).toLocaleString("es-AR");
 const f0 = v => v==null||isNaN(v) ? "—" : Math.round(v).toLocaleString("es-AR");
-const APP_VER = "rc-v41";
+const APP_VER = "rc-v42";
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
 const slug = s => norm(s).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || uid();
 function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2600); }
@@ -982,7 +1018,7 @@ function renderHome(){
     <h2>Hoy</h2>
     <div class="card">${partos.length?`<div class="chips" style="margin-bottom:8px"><span class="chip ok">${partos.length} partos</span><span class="chip">${partos.filter(p=>p.sexo==="M").length} M</span><span class="chip">${partos.filter(p=>p.sexo==="H").length} H</span>${partos.filter(p=>p.estado==="muerto").length?`<span class="chip bad">${partos.filter(p=>p.estado==="muerto").length} muertos</span>`:""}</div>`:""}
       ${hoyEv.length?`<div class="list">${hoyEv.sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,12).map(rowEv).join("")}</div>`:`<p class="muted" style="margin:0">Todavía no cargaste nada hoy.</p>`}
-      ${hoyEv.length?`<button class="btn block" style="margin-top:10px" data-share="hoy">Copiar resumen del día</button>`:""}
+      ${hoyEv.length?`<button class="btn block" style="margin-top:10px" data-share="hoy">Copiar resumen del día</button><button class="btn block" style="margin-top:10px" data-pdf="hoy">Descargar PDF</button>`:""}
     </div>`;
   if(S.tab==="manga") return `${banners()}
     <h1>Manga</h1>
@@ -1041,7 +1077,11 @@ async function instalar(){
   INST.evento=null; render();
 }
 function rowEv(e){
-  const t=TIPOS[e.tipo]?.n||e.tipo;
+  const t=TIPOS[e.tipo]?.n||e.tipo, d=detEv(e);
+  const pend=S.outbox[e.id];
+  return `<div class="item"><span class="grow"><b>${t}${e.potrero?` <span class="small muted">· ${esc(e.potrero)}</span>`:""}</b><span class="small muted">${esc(d)}</span></span><span class="small muted" style="text-align:right">${fmtDT(e.fecha).slice(-5)}${pend?`<br><span class="chip warn">sin subir</span>`:""}</span>${e.tipo==="recuento"?`<button class="chip bad" data-del="${e.id}">Quitar</button>`:`<button class="chip" data-edit="${e.id}">Editar</button>`}</div>`;
+}
+function detEv(e){
   let d="";
   if(e.tipo==="parto") d=`Madre ${e.madre?fmtEID(e.madre):"sin ident."} · ${e.sexo||"?"} · ${e.estado}${e.peso?" · "+e.peso+" kg":""}`;
   else if(e.tipo==="tacto") d=`${e.animal?fmtEID(e.animal):"s/i"} · ${e.resultado}`;
@@ -1054,9 +1094,9 @@ function rowEv(e){
   else if(e.tipo==="instal") d=`${e.resultado||""}${e.bebida?" · bebida "+e.bebida:""}${e.molino?" · molino "+e.molino:""}${e.alambrado?" · alambr. "+e.alambrado:""}`;
   else if(e.tipo==="pedido") d=`${e.categoria||""}${e.valor==="urgente"?" · URGENTE":""} · ${e.resultado==="hecho"?"hecho":"pendiente"}${e.obs?" · "+e.obs.slice(0,50):""}`;
   else if(e.tipo==="novedad") d=`${e.categoria||""} ${e.obs?"· "+e.obs.slice(0,50):""}`;
+  else if(e.tipo==="recuento") d=`${e.lote||""} · ${f0(num(e.cabezas)||0)} cab${e.detalle?" · "+e.detalle:""}`;
   else d=`${e.animal?fmtEID(e.animal):""} ${serieTxt(e)}`;
-  const pend=S.outbox[e.id];
-  return `<div class="item"><span class="grow"><b>${t}${e.potrero?` <span class="small muted">· ${esc(e.potrero)}</span>`:""}</b><span class="small muted">${esc(d)}</span></span><span class="small muted" style="text-align:right">${fmtDT(e.fecha).slice(-5)}${pend?`<br><span class="chip warn">sin subir</span>`:""}</span><button class="chip" data-edit="${e.id}">Editar</button></div>`;
+  return d;
 }
 
 function renderForm(){
@@ -1096,6 +1136,7 @@ function parseQuery(q){
   if(/\bcc\b|condicion/.test(s)) add("cc","condición corporal");
   if(/vacun|sanid|tratam|desparasit/.test(s)) add("sanidad","sanidad");
   if(/novedad/.test(s)) add("novedad","novedades");
+  if(/recuento|conteo/.test(s)) add("recuento","recuentos de hacienda");
   if(/recorrid|pastura|remanente|novedad/.test(s)) add("lote","recorridas y novedades");
   if(/bebida|molino|alambrad/.test(s)) add("instal","bebidas, molino y alambrados");
   if(/muert|mortand|baja/.test(s)){
@@ -1172,6 +1213,7 @@ function metricas(rs){
   if(t==="lote") cols.push(["pm","Pastura reg./mala",r=>r.filter(x=>x.pastura==="malo"||x.pastura==="regular").length],["rb","Remanente bajo",r=>r.filter(x=>x.remanente==="bajo").length],["ag","Aguada reg./mala",r=>r.filter(x=>x.aguada==="regular"||x.aguada==="malo").length],["in","Entradas",r=>r.filter(x=>x.movimiento==="ingreso").length],["eg","Salidas",r=>r.filter(x=>x.movimiento==="egreso").length]);
   if(t==="hacienda") cols.push(["hc","Cabezas",r=>f0(r.reduce((a,x)=>a+(num(x.cabezas)||0),0))],["hk","Kg",r=>f0(r.reduce((a,x)=>a+(num(x.kgTot)||0),0))]);
   if(t==="instal") cols.push(["cp","Con problemas",r=>r.filter(x=>x.resultado==="con problemas").length],["be","Bebida reg./mala",r=>r.filter(x=>x.bebida==="regular"||x.bebida==="malo").length],["mo","Molino con falla",r=>r.filter(x=>x.molino==="falla"||x.molino==="parado").length],["al","Alambrado reg./malo",r=>r.filter(x=>x.alambrado==="regular"||x.alambrado==="malo").length]);
+  if(t==="recuento") cols.push(["rc","Cabezas contadas",r=>f0(r.reduce((a,x)=>a+(num(x.cabezas)||0),0))],["rl","Lotes",r=>new Set(r.map(x=>x.loteId||x.lote)).size]);
   if(t==="sanidad") cols.push(["an","Animales",r=>f0(r.reduce((a,x)=>a+(num(x.cantidad)||(x.lista?x.lista.length:0)),0))]);
   return cols;
 }
@@ -1256,7 +1298,7 @@ function stockCard(){
       <div class="list" style="margin-top:6px">${k.fuera.map(({e,l,motivo})=>`<div class="item"><span class="grow"><b>${e.tipo==="muerte"?"Muerte":(MOVS.find(m=>m[0]===e.mov)||["",e.mov])[1]} · ${f0(num(e.cabezas)||1)} cab${e.categoria?" "+esc(e.categoria):""}</b><span class="small muted" style="display:block">${fmtDT(e.fecha)}${e.destino?" · "+esc(e.destino):""} · ${motivo==="antes"?`cargado antes del conteo del lote ${esc(l.nombre)} (${fmtDT(l.stockTs)})`:"sin lote: baja el total pero no el lote"}</span></span>${motivo==="antes"?`<button class="chip ok" data-stkantes="${e.id}">Descontar</button>`:""}<button class="chip" data-edit="${e.id}">Editar</button></div>`).join("")}</div>
       <p class="small muted" style="margin:6px 0 0">"Descontar" pasa la fecha del conteo del lote a justo antes del movimiento. Si el conteo ya lo tenía descontado, no lo toques. "Sin lote": tocá Editar y elegí el lote.</p></div>`:""}
     <p class="small muted" style="margin:8px 0 0">Actual = conteo del lote + nacimientos (partos vivos) + entradas − muertes − salidas cargadas después de la fecha del conteo. Al volver a contar, actualizá las cabezas del lote: la fecha del conteo pasa a ser ese día.</p>
-    <button class="btn" data-share="stock" style="margin-top:10px">Copiar para WhatsApp</button></div>`;
+    <button class="btn" data-share="stock" style="margin-top:10px">Copiar para WhatsApp</button><button class="btn" data-pdf="stock" style="margin-top:10px">Descargar PDF</button></div>`;
 }
 function renderResumen(){
   if(!S.filt){ S.filt={tipos:["parto"], desde:"", hasta:"", grupo:"dia"}; }
@@ -1268,6 +1310,7 @@ function renderResumen(){
   const lotes=[...new Set([...lotesE().map(l=>l.nombre),...eventos().flatMap(lotesNomDe)])].sort((a,b)=>a.localeCompare(b,"es",{numeric:true}));
   return `<h1>Resumen</h1>
   ${stockCard()}
+  ${novedadesCard()}
   <div class="card">
     <div class="field"><label>Preguntá escribiendo</label>
       <div style="display:flex;gap:8px"><input type="search" id="q" value="${esc(S.q)}" placeholder="Ej: partos de septiembre por potrero" enterkeyhint="search"><button class="btn solid" data-ask="1">Ver</button></div>
@@ -1275,6 +1318,7 @@ function renderResumen(){
     </div>
     <details ${S.why&&S.why.length?"":"open"}><summary>Filtros</summary>
       <div class="field"><label>Qué</label><div class="chips">${Object.entries(TIPOS).map(([k,v])=>`<button class="chip ${F.tipos.includes(k)?"ok":""}" data-ft="${k}">${v.pl}</button>`).join("")}</div></div>
+      <div class="chips" style="margin-bottom:8px">${PERIODOS.map(([k,l,n])=>`<button type="button" class="chip ${F.desde===desdeDias(n)&&!F.hasta?"ok":""}" data-fper="${n}">${l}</button>`).join("")}<button type="button" class="chip ${!F.desde&&!F.hasta?"ok":""}" data-fper="0">Todo</button></div>
       <div class="row2">${fld("Desde",`<input type="date" data-filt="desde" value="${F.desde||""}">`)}${fld("Hasta",`<input type="date" data-filt="hasta" value="${F.hasta||""}">`)}</div>
       <div class="row2">${fld("Potrero",`<select data-filt="potrero"><option value="">Todos</option>${pots.map(p=>`<option ${F.potrero===p?"selected":""}>${esc(p)}</option>`).join("")}</select>`)}<div></div></div>
       ${lotes.length?fld("Lotes (podés marcar varios)",`<div class="chips"><button type="button" class="chip ${(F.lotes||[]).length||F.lote?"":"ok"}" data-flote="">Todos</button>${lotes.map(p=>`<button type="button" class="chip ${(F.lotes||[]).includes(p)||F.lote===p?"ok":""}" data-flote="${esc(p)}">${esc(p)}</button>`).join("")}</div>`):""}
@@ -1284,7 +1328,7 @@ function renderResumen(){
   <div class="kpis">${cols.map(([k,l,fn])=>`<div class="kpi"><span>${l}</span><b>${fn(rs)}</b></div>`).join("")}</div>
   ${g&&keys.length?`<div class="card scroll"><table><thead><tr><th>${esc(g)}</th>${cols.map(c=>`<th>${c[1]}</th>`).join("")}</tr></thead><tbody>${keys.map(k=>`<tr><td>${esc(k)}</td>${cols.map(c=>`<td>${c[2](grupos[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:""}
   ${g&&keys.length>1&&keys.length<=40?`<div class="card">${barras(keys.map(k=>[k,grupos[k].length]))}</div>`:""}
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" data-share="filt">Copiar para WhatsApp</button><button class="btn" data-csv="1">Descargar planilla (CSV)</button></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" data-share="filt">Copiar para WhatsApp</button><button class="btn" data-pdf="filt">Descargar PDF</button><button class="btn" data-csv="1">Descargar planilla (CSV)</button></div>
   <div class="card"><h3 style="margin-top:0">${rs.length} registros</h3><div class="list">${rs.slice(0,60).map(rowEv).join("")}</div>${rs.length>60?`<p class="small muted">Se muestran los últimos 60. Descargá la planilla para ver todo.</p>`:""}</div>`;
 }
 function barras(pares){
@@ -1305,6 +1349,120 @@ function csv(rs){
   const q=v=>{ v=v==null?"":String(v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const body=[cols.join(";")].concat(rs.map(r=>cols.map(c=>q(c==="campana"?campOf(r):r[c])).join(";"))).join("\n");
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+body],{type:"text/csv"})); a.download=`rodeo-cria-${S.set.estab}-${todayStr()}.csv`; a.click();
+}
+
+
+/* ----- texto de cada resumen (WhatsApp y PDF) ----- */
+function textoShare(k){
+  const d={share:k}; let rs, t;
+    if(d.share==="hoy"){ rs=eventos().filter(x=>(x.fecha||"").startsWith(todayStr())); const pt=rs.filter(x=>x.tipo==="parto"); t=`*${estab().nombre} · ${fmtD(todayStr())}*\nPartos: ${pt.length} (${pt.filter(x=>x.sexo==="M").length} M / ${pt.filter(x=>x.sexo==="H").length} H)${pt.filter(x=>x.estado==="muerto").length?` · muertos: ${pt.filter(x=>x.estado==="muerto").length}`:""}\n`+["muerte","novedad","pedido","lote","instal"].map(tp=>{ const x=rs.filter(r=>r.tipo===tp); return x.length?`${TIPOS[tp].pl}: ${x.map(r=>(r.tipo==="lote"?`${r.lote} ${({ingreso:"entrada",egreso:"salida"})[r.movimiento]||"control"}${r.pastura?" · pastura "+r.pastura:""}${r.remanente?" · remanente "+r.remanente:""}${r.aguada?" · aguada "+r.aguada:""}${r.categoria?" · "+r.categoria:""}${r.obs?" · "+r.obs:""}`:r.tipo==="instal"?`${r.resultado}${r.bebida?" · bebida "+r.bebida:""}${r.molino?" · molino "+r.molino:""}${r.alambrado?" · alambrado "+r.alambrado:""}`:(r.categoria||""))+(r.causa?" ("+r.causa+")":"")+(r.potrero?" en "+r.potrero:"")).join("; ")}\n`:""; }).join("")+`_Cargó: ${S.set.operario||"-"}_`; }
+    else if(d.share==="camp"){ const k=calcCamp(S.campSel); t=`*${estab().nombre}${k.lo?" · "+k.lo.n:""} · campaña ${k.c}/${String(k.c+1).slice(2)}*\nPreñez: ${f1(k.prenez)}% (cabeza ${f1(k.pcab)}%)\nPartos: ${k.partos} · mortandad perinatal ${f1(k.mortPeri)}%\nDestete: ${f1(k.destete)}% · ${f0(k.pesoDest)} kg prom · ${f0(k.kgVaca)} kg/vaca entorada`; }
+    else if(d.share==="idx"){ const k=calcIdx(S.campSel); t=`*${estab().nombre}${k.lo?" · "+k.lo.n:""} · índices campaña ${k.c}/${String(k.c+1).slice(2)}*\n`+[["Preñez",f1(k.prenez),"%"],["Preñez cabeza",f1(k.pcab),"%"],["Parición",f1(k.paricion),"%"],["Concentración 21 d",f1(k.conc21),"%"],["Intervalo entre partos",f0(k.iep)," d"],["Mort. perinatal",f1(k.mortPeri),"%"],["Mort. parto-destete",f1(k.mortDest),"%"],["Destete",f1(k.destete),"%"],["Peso destete",f0(k.pesoDest)," kg"],["Ajustado 205 d",f0(k.adj205)," kg"],["Kg/vaca entorada",f0(k.kgVaca)," kg"],["Kg destetados/ha",f0(k.kgHa)," kg"],["Carga",f1(k.evHa)," EV/ha"],["Producción",f0(k.prodHa)," kg/ha"],["Extracción",f1(k.extr),"%"],["Refugo",f1(k.refugo),"%"],["Reposición",f1(k.repos),"%"]].filter(x=>x[1]!=="—").map(x=>`${x[0]}: ${x[1]}${x[2]}`).join("\n"); }
+    else if(d.share==="stock"){ const E=estab(), k=stockCalc(E); t=`*${E.nombre} · stock ${fmtD(todayStr())}*\n`+k.filas.map(r=>`- ${r.c.nombre}: ${f0(r.actual)}`).join("\n")+`\n*Total: ${f0(k.tot)} cabezas*\n\nPor lote:\n`+(()=>{ const M=stockMatriz(k); return M.filas.map(f=>{ const d=M.cols.map((r,i)=>f.v[i]?`${r.c.nombre} ${f0(f.v[i])}`:"").filter(Boolean); return `- ${f.x.l.nombre}: ${f0(f.x.actual)}`+(d.length>1?` (${d.join(", ")})`:""); }).join("\n"); })(); }
+    else if(d.share==="lotes"){ const P=S.loteP||{}; t=`*${estab().nombre} · lotes${P.desde?" desde "+fmtD(P.desde):""}${P.hasta?" hasta "+fmtD(P.hasta):""}*\n`+lotesE().map(l=>{ const k=calcLote(l,P.desde,P.hasta); return `- ${l.nombre}: ${k.partos} partos de ${k.vientres} vientres (${f1(k.paricion)}%) · mort. perinatal ${f1(k.mortPeri)}% · muertes adultos ${k.ma}`; }).join("\n"); }
+    else if(d.share==="nov"){ const p=perNov(), L=novedadesDe(S.novPer); t=`*${estab().nombre} · novedades · ${p[1].toLowerCase()}*\n`+(L.length?L.map(e=>`- ${fmtD((e.fecha||"").slice(0,10))}${e.lote?" "+e.lote:""}${e.potrero?" (pot. "+e.potrero+")":""}: ${[e.categoria,e.obs].filter(Boolean).join(" · ")}`).join("\n"):"Sin novedades"); }
+    else if(d.share==="rec"){ const L=recuentosDe(S.recMes); t=`*${estab().nombre} · recuentos de hacienda · ${mesTxt(S.recMes)}*\n`+(L.length?L.map(e=>`- ${fmtD((e.fecha||"").slice(0,10))} ${e.lote}: ${f0(num(e.cabezas)||0)} cab${e.detalle?" ("+e.detalle+")":""}`).join("\n"):"Sin recuentos"); }
+    else { rs=filtrar(S.filt); t=textoResumen(rs, S.why&&S.why.length?S.why.join(", "):"resumen"); }
+  return t;
+}
+/* ----- períodos rápidos ----- */
+const PERIODOS=[["semana","Última semana",7],["mes","Último mes",30],["anio","Último año",365]];
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+function desdeDias(n){ const d=new Date(); d.setDate(d.getDate()-n); return ymd(d); }
+const mesTxt = m => m ? `${MESES_L[Number(m.slice(5,7))-1]} ${m.slice(0,4)}` : "todos los meses";
+/* ----- novedades (recorridas con novedad o detalle, y novedades viejas) ----- */
+const perNov = () => PERIODOS.find(x=>x[0]===S.novPer)||PERIODOS[0];
+function novedadesDe(per){
+  const p=PERIODOS.find(x=>x[0]===per)||PERIODOS[0], desde=desdeDias(p[2]);
+  return eventos().filter(e=>(e.tipo==="novedad"||(e.tipo==="lote"&&!e.auto&&(e.categoria||String(e.obs||"").trim())))&&(e.fecha||"").slice(0,10)>=desde)
+    .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+}
+function novedadesCard(){
+  const p=perNov(), L=novedadesDe(p[0]), cnt={}; L.forEach(e=>{ const c=e.categoria||"Sin tipo"; cnt[c]=(cnt[c]||0)+1; });
+  return `<div class="card" id="novedades"><h3 style="margin-top:0">Novedades</h3>
+    <div class="chips" style="margin-bottom:8px">${PERIODOS.map(([k,l])=>`<button type="button" class="chip ${p[0]===k?"ok":""}" data-novper="${k}">${l}</button>`).join("")}</div>
+    ${L.length?`<p class="small muted" style="margin:0 0 6px">${L.length} novedad${L.length===1?"":"es"}: ${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${esc(c)} ${n}`).join(" · ")}</p>
+    <div class="list">${L.slice(0,40).map(e=>`<div class="item"><span class="grow"><b>${esc(e.categoria||"Novedad")}${e.lote?` <span class="small muted">· ${esc(e.lote)}</span>`:""}</b>${e.obs?`<span class="small" style="display:block">${esc(e.obs)}</span>`:""}<span class="small muted" style="display:block">${fmtDT(e.fecha)}${e.potrero?" · potrero "+esc(e.potrero):""}${e.operario?" · "+esc(e.operario):""}</span></span><button class="chip" data-edit="${e.id}">Editar</button></div>`).join("")}</div>
+    ${L.length>40?`<p class="small muted">Se muestran las últimas 40. El PDF las trae todas.</p>`:""}`:`<p class="muted" style="margin:0">Sin novedades en ${p[1].toLowerCase()}.</p>`}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" data-share="nov">Copiar para WhatsApp</button><button class="btn" data-pdf="nov">Descargar PDF</button></div></div>`;
+}
+/* ----- recuentos de hacienda: cada conteo de lote queda registrado ----- */
+const compDet = (comp,E) => catsE(E).filter(c=>num((comp||{})[c.id])).map(c=>`${c.nombre} ${f0(num(comp[c.id]))}`).join(", ");
+function recuentoRec(l,ts,E,viejo){
+  const comp={...(l.comp||{})}, tot=Object.values(comp).reduce((a,v)=>a+(num(v)||0),0);
+  return {clase:"evento", id:uid(), estab:S.set.estab, tipo:"recuento", fecha:ts, operario:viejo?"":S.set.operario, usuario:viejo?"":(S.set.usrId||""), potrero:l.potrero||"", lote:l.nombre, loteId:l.id, comp, cabezas:tot, detalle:compDet(comp,E), obs:""};
+}
+const fT = x => x&&x.endsWith("T00:00") ? fmtD(x) : fmtDT(x);
+const recuentosEv = () => eventos().filter(e=>e.tipo==="recuento");
+/* recuentos guardados + el conteo actual de cada lote que todavía no quedó registrado */
+function recuentosTodos(){
+  const E=estab(), R=recuentosEv();
+  const virt=lotesE(E).filter(l=>l.stockTs&&!R.some(x=>x.loteId===l.id&&x.fecha===l.stockTs)).map(l=>({...recuentoRec(l,l.stockTs,E,true),id:"v-"+l.id,virtual:true}));
+  return [...R,...virt].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||String(a.lote).localeCompare(String(b.lote),"es",{numeric:true}));
+}
+const recuentosDe = m => recuentosTodos().filter(e=>!m||(e.fecha||"").slice(0,7)===m);
+function recuentosCard(){
+  const T=recuentosTodos(); if(!T.length) return `<div class="card"><h3 style="margin-top:0">Recuentos de hacienda</h3><p class="muted" style="margin:0">Cada vez que guardes un lote con las cabezas contadas, el recuento queda registrado acá.</p></div>`;
+  const meses=[...new Set(T.map(e=>(e.fecha||"").slice(0,7)).filter(Boolean))].sort().reverse();
+  if(S.recMes===undefined||(S.recMes&&!meses.includes(S.recMes))) S.recMes=meses[0]||"";
+  const L=recuentosDe(S.recMes), cnt=m=>T.filter(e=>(e.fecha||"").slice(0,7)===m).length;
+  return `<div class="card" id="recuentos"><h3 style="margin-top:0">Recuentos de hacienda</h3>
+    <div class="chips" style="margin-bottom:8px">${meses.map(m=>`<button type="button" class="chip ${S.recMes===m?"ok":""}" data-recmes="${m}">${mesTxt(m)} (${cnt(m)})</button>`).join("")}<button type="button" class="chip ${!S.recMes?"ok":""}" data-recmes="">Todos</button></div>
+    <div class="list">${L.map(e=>`<div class="item"><span class="grow"><b>${esc(e.lote)} · ${f0(num(e.cabezas)||0)} cab</b>${e.detalle?`<span class="small" style="display:block">${esc(e.detalle)}</span>`:""}<span class="small muted" style="display:block">${fT(e.fecha)}${e.operario?" · "+esc(e.operario):""}${e.virtual?" · conteo cargado en el lote":""}</span></span>${e.virtual?"":`<button class="chip bad" data-del="${e.id}">Quitar</button>`}</div>`).join("")}</div>
+    <p class="small muted" style="margin:6px 0 0">Se registra solo al guardar un lote con cabezas nuevas o con otra fecha de conteo. Repartir las mismas cabezas en otras categorías no cuenta como recuento.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" data-share="rec">Copiar para WhatsApp</button><button class="btn" data-pdf="rec">Descargar PDF</button></div></div>`;
+}
+/* ----- PDF con formato APSAVET (se imprime → "Guardar como PDF") ----- */
+const tbl = (cab,filas,tot) => `<table><thead><tr>${cab.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${filas.map(f=>`<tr>${f.map(v=>`<td>${v==null?"":esc(v)}</td>`).join("")}</tr>`).join("")}${tot?`<tr class="tot">${tot.map(v=>`<td>${v==null?"":esc(v)}</td>`).join("")}</tr>`:""}</tbody></table>`;
+const kpisH = a => `<div class="kpis">${a.map(([l,v])=>`<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join("")}</div>`;
+function txt2html(t){
+  const out=[]; let kv=[];
+  const flush=()=>{ if(kv.length){ out.push(`<table class="kv"><tbody>${kv.map(([a,b])=>`<tr><td>${esc(a)}</td><td><b>${esc(b)}</b></td></tr>`).join("")}</tbody></table>`); kv=[]; } };
+  t.split("\n").forEach(raw=>{ let x=raw.trim().replace(/^_(.*)_$/,"$1"); if(!x){ flush(); return; }
+    if(/^\*.*\*$/.test(x)){ flush(); out.push(`<p><b>${esc(x.slice(1,-1))}</b></p>`); return; }
+    if(/:$/.test(x)){ flush(); out.push(`<h2>${esc(x.slice(0,-1))}</h2>`); return; }
+    x=x.replace(/^- /,"");
+    const i=x.indexOf(": "); if(i>0&&i<40) kv.push([x.slice(0,i),x.slice(i+2)]); else kv.push(["",x]);
+  });
+  flush(); return out.join("");
+}
+function pdfBody(k){
+  const E=estab();
+  if(k==="stock"){ const s=stockCalc(E), ha=haCria(E), M=stockMatriz(s);
+    return kpisH([["Cabezas",f0(s.tot)],["Vientres",f0(s.vientres)],["EV",f1(s.ev)],...(ha?[["EV/ha",f1(s.ev/ha)]]:[])])
+      +`<h2>Por categoría</h2>`+tbl(["Categoría","Conteo","Nacim.","Entradas","Muertes","Salidas","Actual"],s.filas.map(r=>[r.c.nombre,f0(r.conteo),r.nac?"+"+f0(r.nac):"",r.ent?"+"+f0(r.ent):"",r.mue?"−"+f0(r.mue):"",r.sal?"−"+f0(r.sal):"",f0(r.actual)]),["Total",f0(s.filas.reduce((a,r)=>a+r.conteo,0)),"","","","",f0(s.tot)])
+      +`<h2>Por lote</h2>`+tbl(["Lote","Conteo","Fecha conteo","+","−","Actual"],s.lotes.map(x=>[x.l.nombre,f0(x.conteo),x.l.stockTs?fmtD(x.l.stockTs):"",x.mas?"+"+f0(x.mas):"",x.menos?"−"+f0(x.menos):"",f0(x.actual)]))
+      +(M.cols.length?`<h2>Por lote y categoría</h2>`+tbl(["Lote",...M.cols.map(r=>r.c.nombre),"Total"],M.filas.map(f=>[f.x.l.nombre,...f.v.map(v=>v?f0(v):""),f0(f.x.actual)]),["Total",...M.cols.map(r=>f0(r.actual)),f0(s.tot)]):""); }
+  if(k==="lotes"){ const P=S.loteP||{};
+    return (P.desde||P.hasta?`<p class="sub">Período: ${P.desde?"desde "+fmtD(P.desde):""} ${P.hasta?"hasta "+fmtD(P.hasta):""}</p>`:"")
+      +tbl(["Lote","Vientres","Partos","% parición","Peso nac.","Mort. perinatal %","Mort. terneros %","Mort. adultos %","Preñez %","Cab/ha"],lotesE(E).map(l=>{ const c=calcLote(l,P.desde,P.hasta); return [l.nombre,f0(c.vientres),c.partos,f1(c.paricion),f1(c.pesoNac),f1(c.mortPeri),f1(c.mortTern),f1(c.mortAd),f1(c.prenez),f1(c.carga)]; })); }
+  if(k==="nov"){ const p=perNov(), L=novedadesDe(p[0]), cnt={}; L.forEach(e=>{ const c=e.categoria||"Sin tipo"; cnt[c]=(cnt[c]||0)+1; });
+    return `<p class="sub">${p[1]} (desde ${fmtD(desdeDias(p[2]))}) · ${L.length} novedad${L.length===1?"":"es"}</p>`
+      +(L.length?kpisH(Object.entries(cnt).sort((a,b)=>b[1]-a[1]))+tbl(["Fecha","Lote","Potrero","Novedad","Detalle","Cargó"],L.map(e=>[fmtDT(e.fecha),e.lote||"",e.potrero||"",e.categoria||"",e.obs||"",e.operario||""])):"<p>Sin novedades en el período.</p>"); }
+  if(k==="rec"){ const L=recuentosDe(S.recMes);
+    return `<p class="sub">${mesTxt(S.recMes)} · ${L.length} recuento${L.length===1?"":"s"}</p>`
+      +(L.length?tbl(["Fecha","Lote","Cabezas","Por categoría","Cargó"],L.map(e=>[fT(e.fecha),e.lote,f0(num(e.cabezas)||0),e.detalle||"",e.operario||""])):"<p>Sin recuentos.</p>"); }
+  if(k==="filt"){ const F=S.filt, rs=filtrar(F), cols=metricas(rs), g=F.grupo||"";
+    let h=`<p class="sub">${F.tipos&&F.tipos.length?F.tipos.map(t=>TIPOS[t]?.pl||t).join(", "):"Todos los registros"}${F.desde?" · desde "+fmtD(F.desde):""}${F.hasta?" · hasta "+fmtD(F.hasta):""}${F.potrero?" · potrero "+F.potrero:""}${(F.lotes||[]).length?" · lotes "+F.lotes.join(", "):""}</p>`+kpisH(cols.map(([kk,l,fn])=>[l,String(fn(rs))]));
+    if(g){ const gr={}; rs.forEach(e=>{ const kk=claveGrupo(e,g); (gr[kk]=gr[kk]||[]).push(e); }); const ks=ordenar(Object.keys(gr)); if(ks.length) h+=`<h2>Por ${esc(g)}</h2>`+tbl([g,...cols.map(c=>c[1])],ks.map(kk=>[kk,...cols.map(c=>String(c[2](gr[kk])))])); }
+    return h+`<h2>Registros (${rs.length})</h2>`+tbl(["Fecha","Tipo","Potrero","Detalle"],rs.slice(0,400).map(e=>[fmtDT(e.fecha),TIPOS[e.tipo]?.n||e.tipo,e.potrero||"",detEv(e)]))+(rs.length>400?`<p class="sub">Se muestran los últimos 400.</p>`:""); }
+  if(k==="hoy"){ const rs=eventos().filter(x=>(x.fecha||"").startsWith(todayStr())).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
+    return txt2html(textoShare("hoy").split("\n").slice(1).join("\n"))+`<h2>Registros del día (${rs.length})</h2>`+tbl(["Hora","Tipo","Potrero","Detalle"],rs.map(e=>[(e.fecha||"").slice(11,16),TIPOS[e.tipo]?.n||e.tipo,e.potrero||"",detEv(e)])); }
+  return null;
+}
+function pdfShare(k){
+  const E=estab(), t=textoShare(k), l0=t.split("\n")[0].replace(/\*/g,"");
+  let titulo=l0.startsWith(E.nombre+" · ")?l0.slice(E.nombre.length+3):l0; titulo=titulo.charAt(0).toUpperCase()+titulo.slice(1);
+  const body=pdfBody(k)||txt2html(t.split("\n").slice(1).join("\n")), ahora=fmtDT(nowLocal());
+  let el=document.getElementById("pdf"); if(!el){ el=document.createElement("div"); el.id="pdf"; document.body.appendChild(el); }
+  el.innerHTML=`<div class="ph"><div class="logo"><span class="iso"></span><div><b>APSA<span class="v">VET</span></b><small>Asesoramiento en Producción y Salud Animal</small></div></div><div class="r"><b>${esc(E.nombre)}</b><small>Rodeo de cría · ${ahora}</small></div></div><div class="bar"></div>
+    <h1>${esc(titulo)}</h1>${body}<div class="foot"><span>APSAVET · Rodeo de cría</span><span>${esc(E.nombre)} · ${ahora}</span></div>`;
+  const tt=document.title; document.title=`${E.nombre} - ${titulo} - ${fmtD(todayStr()).replace(/\//g,"-")}`.replace(/[\/\\:*?"<>|]/g,"-");
+  document.body.classList.add("imprimiendo");
+  const fin=()=>{ document.body.classList.remove("imprimiendo"); document.title=tt; window.removeEventListener("afterprint",fin); };
+  window.addEventListener("afterprint",fin);
+  toast("Elegí \"Guardar como PDF\" en la impresora");
+  setTimeout(()=>{ try{ window.print(); }catch(_){ toast("Este equipo no deja imprimir: abrí la app en Chrome o Safari"); fin(); } },300);
 }
 
 /* ----- indicadores por campaña ----- */
@@ -1359,7 +1517,7 @@ function renderIndicadores(){
   </div>
   ${editorMetas()}
   ${compararCamp(cs)}
-  <button class="btn" data-share="camp">Copiar indicadores para WhatsApp</button>`;
+  <button class="btn" data-share="camp">Copiar indicadores para WhatsApp</button><button class="btn" data-pdf="camp">Descargar PDF</button>`;
 }
 function curvaParicion(k){
   const sem={}; k.par.forEach(e=>{ const key=claveGrupo(e,"semana"); sem[key]=(sem[key]||0)+1; });
@@ -1563,7 +1721,7 @@ function renderIndices(){
     <span class="small muted">Lo demás sale de lo que se carga a campo (partos, muertes, recorridas) y en manga (tacto, CC, destete, pesadas, entradas y salidas). La superficie y las cabezas salen de Oficina → Lotes.</span>
   </div>
   <p class="small muted">La campaña va del entore (octubre) en adelante: tacto, parición, destete y las ventas de ese ciclo.</p>
-  <button class="btn" data-share="idx">Copiar índices para WhatsApp</button>`;
+  <button class="btn" data-share="idx">Copiar índices para WhatsApp</button><button class="btn" data-pdf="idx">Descargar PDF</button>`;
 }
 /* ----- lotes ----- */
 function renderLotes(){
@@ -1587,7 +1745,7 @@ function renderLotes(){
     ${LK.length||num(E.superficieCorr)?`<div class="kpi"><span>Corrales / encierre</span><b>${f0(cabK)}</b><small>cabezas${haK?" en "+f1(haK)+" ha":""}</small></div>`:""}
   </div>
   ${S.loteEd?formLoteEd(S.loteEd):`<div class="card">${L.length?`<div class="list">${L.map(l=>{ const u=ubicLote(l); return `<div class="item"><span class="grow"><b>${esc(l.nombre)}</b>${esCorral(l)?' <span class="small" style="opacity:.8">· corral</span>':""}<span class="small muted" style="display:block">${u.potrero?ubicTxt(u,l):"Sin potrero"}${l.ha?" · "+f1(num(l.ha))+" ha lote":""}${l.pastura?" · "+esc(l.pastura):""}${cargaTxt(l)}</span><span class="small" style="display:block">${compTxt(l)}</span></span><button class="chip" data-led="${l.id}">Editar</button></div>`; }).join("")}</div>`:`<p class="muted" style="margin-top:0">Todavía no hay lotes. Agregá el primero con sus cabezas por categoría.</p>`}
-    <button class="btn solid block" data-lnew="1" style="margin-top:10px">Agregar lote</button></div>`}
+    <button class="btn solid block" data-lnew="1" style="margin-top:10px">Agregar lote</button></div>${recuentosCard()}`}
   <details class="card"><summary>Categorías del rodeo</summary>
     <p class="small muted">Se usan para cargar las cabezas de cada lote. Marcá las que cuentan como vientre para el % de parición. EV = equivalente vaca de cada categoría, para la carga en EV/ha.</p>
     ${catsE(E).map(c=>`<div class="item"><input type="text" data-catn="${c.id}" value="${esc(c.nombre)}" style="flex:1"><label class="small" style="display:flex;gap:4px;align-items:center;white-space:nowrap">EV <input type="text" inputmode="decimal" autocomplete="off" data-catev="${c.id}" value="${String(catEv(c)).replace(".",",")}" style="width:76px;min-height:40px;padding:6px"></label><label class="small" style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input type="checkbox" data-catv="${c.id}" ${c.vientre?"checked":""}> Vientre</label><button class="chip bad" data-catdel="${c.id}">Quitar</button></div>`).join("")}
@@ -1598,7 +1756,7 @@ function renderLotes(){
   <p class="small muted" style="margin-top:-6px">Vacío = todo lo cargado en cada lote.</p>
   <div class="card scroll"><table><thead><tr><th>Lote</th><th>Vientres</th><th>Partos</th><th>% parición</th><th>Partos/día</th><th>Últ. 7 días</th><th>Peso nac.</th><th>Mort. perinatal %</th><th>Mort. terneros %</th><th>Mort. adultos %</th><th>Preñez %</th><th>Cab/ha</th></tr></thead><tbody>${L.map(l=>{ const k=calcLote(l,P.desde,P.hasta); return `<tr><td>${esc(l.nombre)}</td><td>${f0(k.vientres)}</td><td>${k.partos}</td><td>${f1(k.paricion)}</td><td>${f1(k.ritmo)}</td><td>${k.ult7}</td><td>${f1(k.pesoNac)}</td><td>${f1(k.mortPeri)}</td><td>${f1(k.mortTern)}</td><td>${f1(k.mortAd)}</td><td>${f1(k.prenez)}</td><td>${f1(k.carga)}</td></tr>`; }).join("")}</tbody></table></div>
   <p class="small muted">Parición = partos ÷ vientres del lote. Mortandad de adultos = muertes de vacas, vaquillonas y toros ÷ cabezas adultas del lote. Cada evento cuenta para el lote que se eligió al cargarlo.</p>
-  <button class="btn" data-share="lotes">Copiar para WhatsApp</button>`:""}`;
+  <button class="btn" data-share="lotes">Copiar para WhatsApp</button><button class="btn" data-pdf="lotes">Descargar PDF</button>`:""}`;
 }
 function formLoteEd(l){
   return `<div class="card"><h3 style="margin-top:0">${l._nuevo?"Nuevo lote":"Editar lote"}</h3>
@@ -1629,8 +1787,12 @@ function guardarLote(){
   else if(!old || !compIgual) ts = (fIn && fIn!==(old&&old.stockTs||"").slice(0,10) && fIn!==todayStr()) ? fIn+"T00:00" : nowLocal();
   else if(fIn && fIn!==ts.slice(0,10)) ts = fIn===todayStr() ? nowLocal() : fIn+"T00:00";
   if(ts) r.stockTs=ts;
+  if(ts && ts!==(old&&old.stockTs||"")){   // conteo nuevo: queda registrado (y el anterior, si no estaba)
+    if(old&&old.stockTs&&!recuentosEv().some(x=>x.loteId===old.id&&x.fecha===old.stockTs)) put(recuentoRec(old,old.stockTs,E,true));
+    put(recuentoRec(r,ts,E));
+  }
   if(i>=0) E.lotes[i]=r; else E.lotes.push(r);
-  saveEstab(E); S.loteEd=null; persist(); toast("Lote guardado"); render();
+  saveEstab(E); S.loteEd=null; _stk={t:0,k:null}; persist(); toast("Lote guardado"); render();
 }
 /* ----- ajustes ----- */
 function renderAjustes(){
@@ -1766,16 +1928,11 @@ if(f.tipo==="entore"){ auto("vientres", sumL(x=>vientresLote(x)||cabLote(x))); a
     return;
   }
   if(d.pedhecho){ const r=S.R[d.pedhecho]; if(r){ put({...r,resultado:"hecho",hecho:nowLocal(),hechoPor:S.set.operario||""}); toast("Pedido marcado como hecho"); render(); } return; }
-  if(d.share){
-    let rs, t;
-    if(d.share==="hoy"){ rs=eventos().filter(x=>(x.fecha||"").startsWith(todayStr())); const pt=rs.filter(x=>x.tipo==="parto"); t=`*${estab().nombre} · ${fmtD(todayStr())}*\nPartos: ${pt.length} (${pt.filter(x=>x.sexo==="M").length} M / ${pt.filter(x=>x.sexo==="H").length} H)${pt.filter(x=>x.estado==="muerto").length?` · muertos: ${pt.filter(x=>x.estado==="muerto").length}`:""}\n`+["muerte","novedad","pedido","lote","instal"].map(tp=>{ const x=rs.filter(r=>r.tipo===tp); return x.length?`${TIPOS[tp].pl}: ${x.map(r=>(r.tipo==="lote"?`${r.lote} ${({ingreso:"entrada",egreso:"salida"})[r.movimiento]||"control"}${r.pastura?" · pastura "+r.pastura:""}${r.remanente?" · remanente "+r.remanente:""}${r.aguada?" · aguada "+r.aguada:""}${r.categoria?" · "+r.categoria:""}${r.obs?" · "+r.obs:""}`:r.tipo==="instal"?`${r.resultado}${r.bebida?" · bebida "+r.bebida:""}${r.molino?" · molino "+r.molino:""}${r.alambrado?" · alambrado "+r.alambrado:""}`:(r.categoria||""))+(r.causa?" ("+r.causa+")":"")+(r.potrero?" en "+r.potrero:"")).join("; ")}\n`:""; }).join("")+`_Cargó: ${S.set.operario||"-"}_`; }
-    else if(d.share==="camp"){ const k=calcCamp(S.campSel); t=`*${estab().nombre}${k.lo?" · "+k.lo.n:""} · campaña ${k.c}/${String(k.c+1).slice(2)}*\nPreñez: ${f1(k.prenez)}% (cabeza ${f1(k.pcab)}%)\nPartos: ${k.partos} · mortandad perinatal ${f1(k.mortPeri)}%\nDestete: ${f1(k.destete)}% · ${f0(k.pesoDest)} kg prom · ${f0(k.kgVaca)} kg/vaca entorada`; }
-    else if(d.share==="idx"){ const k=calcIdx(S.campSel); t=`*${estab().nombre}${k.lo?" · "+k.lo.n:""} · índices campaña ${k.c}/${String(k.c+1).slice(2)}*\n`+[["Preñez",f1(k.prenez),"%"],["Preñez cabeza",f1(k.pcab),"%"],["Parición",f1(k.paricion),"%"],["Concentración 21 d",f1(k.conc21),"%"],["Intervalo entre partos",f0(k.iep)," d"],["Mort. perinatal",f1(k.mortPeri),"%"],["Mort. parto-destete",f1(k.mortDest),"%"],["Destete",f1(k.destete),"%"],["Peso destete",f0(k.pesoDest)," kg"],["Ajustado 205 d",f0(k.adj205)," kg"],["Kg/vaca entorada",f0(k.kgVaca)," kg"],["Kg destetados/ha",f0(k.kgHa)," kg"],["Carga",f1(k.evHa)," EV/ha"],["Producción",f0(k.prodHa)," kg/ha"],["Extracción",f1(k.extr),"%"],["Refugo",f1(k.refugo),"%"],["Reposición",f1(k.repos),"%"]].filter(x=>x[1]!=="—").map(x=>`${x[0]}: ${x[1]}${x[2]}`).join("\n"); }
-    else if(d.share==="stock"){ const E=estab(), k=stockCalc(E); t=`*${E.nombre} · stock ${fmtD(todayStr())}*\n`+k.filas.map(r=>`- ${r.c.nombre}: ${f0(r.actual)}`).join("\n")+`\n*Total: ${f0(k.tot)} cabezas*\n\nPor lote:\n`+(()=>{ const M=stockMatriz(k); return M.filas.map(f=>{ const d=M.cols.map((r,i)=>f.v[i]?`${r.c.nombre} ${f0(f.v[i])}`:"").filter(Boolean); return `- ${f.x.l.nombre}: ${f0(f.x.actual)}`+(d.length>1?` (${d.join(", ")})`:""); }).join("\n"); })(); }
-    else if(d.share==="lotes"){ const P=S.loteP||{}; t=`*${estab().nombre} · lotes${P.desde?" desde "+fmtD(P.desde):""}${P.hasta?" hasta "+fmtD(P.hasta):""}*\n`+lotesE().map(l=>{ const k=calcLote(l,P.desde,P.hasta); return `- ${l.nombre}: ${k.partos} partos de ${k.vientres} vientres (${f1(k.paricion)}%) · mort. perinatal ${f1(k.mortPeri)}% · muertes adultos ${k.ma}`; }).join("\n"); }
-    else { rs=filtrar(S.filt); t=textoResumen(rs, S.why&&S.why.length?S.why.join(", "):"resumen"); }
-    copiar(t); return;
-  }
+  if(d.share){ copiar(textoShare(d.share)); return; }
+  if(d.pdf){ pdfShare(d.pdf); return; }
+  if(d.novper){ S.novPer=d.novper; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+  if(d.recmes!==undefined){ S.recMes=d.recmes; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
+  if(d.fper){ const n=Number(d.fper); S.filt.desde=n?desdeDias(n):""; S.filt.hasta=""; S.why=null; render(); return; }
   if(d.csv){ csv(filtrar(S.filt)); return; }
   if(d.flote!==undefined){ const F=S.filt; if(!d.flote){ F.lotes=[]; F.lote=""; } else { const a=(F.lotes||[]).slice(); if(F.lote&&!a.includes(F.lote)) a.push(F.lote); F.lote=""; const i=a.indexOf(d.flote); i>=0?a.splice(i,1):a.push(d.flote); F.lotes=a; } S.why=null; render(); return; }
   if(d.ft){ const T=S.filt.tipos; const i=T.indexOf(d.ft); i>=0?T.splice(i,1):T.push(d.ft); S.why=null; render(); return; }
