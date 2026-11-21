@@ -109,7 +109,7 @@ th{font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.03e
 #hojaComp .hc-caja{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px}
 #hojaComp .hc-wa{background:#25D366;border-color:#25D366;color:#fff;font-size:18px;min-height:58px}
 #hojaComp .hc-x{border-color:#ccc;color:#555}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom));background:var(--brand);color:#fff;padding:12px 18px;border-radius:12px;z-index:50;font-weight:600;max-width:90vw;text-align:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom));background:var(--brand);color:#fff;padding:12px 18px;border-radius:12px;z-index:70;font-weight:600;max-width:90vw;text-align:center}
 .serie{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto}
 .estabbar{display:flex;align-items:center;gap:10px;background:var(--brand);color:#fff;border-radius:12px;padding:8px 12px;margin-bottom:12px}.estabbar label{font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.04em}.estabbar select{min-height:44px;padding:8px;flex:1;color:var(--ink);background:#fff}
 .kblock{border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0}.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0 10px}.kgrid .field>label{text-transform:none;letter-spacing:0}
@@ -270,7 +270,7 @@ const f0 = v => v==null||isNaN(v) ? "—" : Math.round(v).toLocaleString("es-AR"
 const APP_VER = "rc-v43";
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
 const slug = s => norm(s).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || uid();
-function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2600); }
+function toast(m,ms){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,ms||2600); }
 function vibrar(){ try{ navigator.vibrate && navigator.vibrate(40); }catch(_){} }
 
 // Caravana electrónica: 15 dígitos (ej. 032 000123456789). Se limpian espacios y guiones.
@@ -1549,16 +1549,18 @@ function informeXlsx(inf){
 }
 /* ----- compartir: abre el menú de compartir del celular (WhatsApp, etc.) con el archivo ----- */
 function descargarArch(blob,nombre){ const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),60000); }
+let errComp="";
 async function compartirArch(file,titulo){
-  try{ await navigator.share({files:[file],title:titulo}); return "ok"; }
-  catch(err){ return err&&err.name==="AbortError"?"cancel":"error"; }
+  /* solo el archivo: con título/texto algunos Android (y WhatsApp) descartan el adjunto */
+  try{ await navigator.share({files:[file]}); return "ok"; }
+  catch(err){ if(err&&err.name==="AbortError") return "cancel"; errComp=(err&&(err.name+": "+err.message))||"error"; console.error(err); return "error"; }
 }
 /* hoja con botones: el toque nuevo del usuario habilita compartir aunque armar el PDF haya tardado */
 function hojaCompartir(file,blob,titulo,puede){
   cerrarHoja();
   const h=document.createElement("div"); h.id="hojaComp";
   h.innerHTML=`<div class="hc-fondo" data-hc="x"></div><div class="hc-caja">
-    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo</b>
+    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo <span class="muted" style="font-size:11px;font-weight:400">v45</span></b>
     <div class="muted" style="font-size:13px;margin-bottom:12px;word-break:break-word">${esc(file.name)}</div>
     ${puede?`<button class="btn solid hc-wa" data-hc="share">Compartir por WhatsApp</button>`:`<div class="muted" style="font-size:13px;margin-bottom:10px">Este navegador no deja mandar archivos directo. Descargalo y en WhatsApp tocá el clip → Documento.${navInterno()?` Si abriste la app desde WhatsApp, abrila en ${esIOS()?"Safari":"Chrome"} para compartir directo.`:""}</div>`}
     <button class="btn" data-hc="dl">Descargar</button>
@@ -1567,7 +1569,7 @@ function hojaCompartir(file,blob,titulo,puede){
   h.addEventListener("click",async ev=>{ const k=ev.target.closest("[data-hc]"); if(!k) return; const a=k.dataset.hc;
     if(a==="x") return cerrarHoja();
     if(a==="dl"){ descargarArch(blob,file.name); toast("Descargado. En WhatsApp: clip → Documento."); return; }
-    if(a==="share"){ const r=await compartirArch(file,titulo); if(r==="ok") cerrarHoja(); else if(r==="error") toast("No se pudo compartir: tocá Descargar"); } });
+    if(a==="share"){ const r=await compartirArch(file,titulo); if(r==="ok") cerrarHoja(); else if(r==="error") toast("No se pudo compartir ("+errComp+"). Tocá Descargar",9000); } });
   document.body.appendChild(h);
 }
 function cerrarHoja(){ const h=document.getElementById("hojaComp"); if(h) h.remove(); }
