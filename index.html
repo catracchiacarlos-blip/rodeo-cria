@@ -267,7 +267,7 @@ const num = v => { if(v===""||v==null) return null; const n=parseFloat(String(v)
 const pct = (a,b) => b>0 ? a/b*100 : null;
 const f1 = v => v==null||isNaN(v) ? "—" : (Math.round(v*10)/10).toLocaleString("es-AR");
 const f0 = v => v==null||isNaN(v) ? "—" : Math.round(v).toLocaleString("es-AR");
-const APP_VER = "rc-v50";
+const APP_VER = "rc-v51";
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
 const slug = s => norm(s).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || uid();
 function toast(m,ms){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,ms||2600); }
@@ -464,6 +464,7 @@ function mezclarCfg(base, local, server){
 const necesitaConexion = () => !!(S.set.api && S.set.codigo && S.set.codigoSync!==S.set.codigo);
 async function sync(){
   if(!S.set.api){ S.syncState="local"; renderSync(); return; }
+  if(!S.set.codigo){ S.syncState="sincod"; S.codMal=false; renderSync(); return; }   // sin código: la app se usa igual, sube cuando se carga el código
   if(!navigator.onLine){ S.syncState="offline"; renderSync(); return; }
   if(S.syncState==="busy") return;
   S.syncState="busy"; renderSync();
@@ -509,8 +510,8 @@ async function sync(){
 }
 function renderSync(){
   const n=Object.keys(S.outbox).length, d=$("#sync-dot"), t=$("#sync-txt");
-  d.className="dot"+(S.syncState==="err"?" err":(n||S.syncState==="offline"||S.syncState==="local")?" off":"");
-  t.textContent = S.syncState==="busy" ? "Subiendo…" : !S.set.api ? (n?`${n} en el celular`:"Sin servidor") : n ? `${n} sin subir` : S.syncState==="err" ? "Error" : "Al día";
+  d.className="dot"+(S.syncState==="err"?" err":(n||S.syncState==="offline"||S.syncState==="local"||S.syncState==="sincod")?" off":"");
+  t.textContent = S.syncState==="busy" ? "Subiendo…" : !S.set.api ? (n?`${n} en el celular`:"Sin servidor") : S.syncState==="sincod" ? (n?`${n} en el celular`:"Sin código") : n ? `${n} sin subir` : S.syncState==="err" ? "Error" : "Al día";
 }
 window.addEventListener("online",()=>sync());
 window.addEventListener("offline",()=>{ S.syncState="offline"; renderSync(); });
@@ -1050,6 +1051,8 @@ function lotesCampo(){
 function banners(){
   let h="";
   if(!S.set.api) h+=`<div class="banner"><b>Sin servidor configurado.</b> Lo que cargues queda guardado en este celular. Configuralo en Oficina → Ajustes.</div>`;
+  else if(!S.set.codigo) h+=`<div class="banner"><b>Falta el código del campo.</b> La app ya funciona y lo que cargues queda en el celular; se sube cuando pongas el código que te pasa el asesor.
+    <div style="display:flex;gap:8px;margin-top:8px"><input type="text" id="cod-nuevo" autocapitalize="characters" autocomplete="off" placeholder="Código"><button class="btn solid" data-codnuevo="1">Guardar</button></div></div>`;
   else if(S.syncState==="err" && S.codMal) h+=`<div class="banner"><b>El código de acceso no es válido.</b> Pedile el código nuevo al asesor y escribilo acá. Lo cargado sigue guardado en el celular.
     <div style="display:flex;gap:8px;margin-top:8px"><input type="text" id="cod-nuevo" autocapitalize="characters" autocomplete="off" placeholder="Código"><button class="btn solid" data-codnuevo="1">Guardar</button></div></div>`;
   else if(S.syncState==="err") h+=`<div class="banner"><b>No se pudo subir.</b> ${esc(S.syncErr)}. Los datos siguen guardados en el celular.</div>`;
@@ -1058,12 +1061,14 @@ function banners(){
 }
 /* ----- instalar en el celular ----- */
 const INST = { evento:null, oculto:false };
+// en Bienvenido solo se redibuja la tarjeta de instalar, para no borrar lo que se está escribiendo
+function refrescarInst(){ if(S.view==="setup"){ const c=$("#inst-setup"); if(c) c.innerHTML=bannerInstalar(); } else render(); }
 try{ INST.oculto = localStorage.getItem("rc-inst-no")==="1"; }catch(_){}
 const instalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone===true;
 const esIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 const navInterno = () => /WhatsApp|FBAN|FBAV|Instagram|Line\/|wv\)/i.test(navigator.userAgent);
-window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); INST.evento=e; if(S.view!=="setup") render(); });
-window.addEventListener("appinstalled", () => { INST.evento=null; toast("App instalada. Ya abre sin señal."); render(); });
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); INST.evento=e; refrescarInst(); });
+window.addEventListener("appinstalled", () => { INST.evento=null; toast("App instalada. Ya abre sin señal."); refrescarInst(); });
 /* Samsung Internet no deja mandar archivos a WhatsApp: se ofrece pasar la app a Chrome con un toque (lleva la configuración) */
 const esSamsung = () => /SamsungBrowser/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
 function linkChrome(){
@@ -1098,7 +1103,7 @@ async function instalar(){
   if(!INST.evento) return;
   INST.evento.prompt();
   try{ await INST.evento.userChoice; }catch(_){}
-  INST.evento=null; render();
+  INST.evento=null; refrescarInst();
 }
 function rowEv(e){
   const t=TIPOS[e.tipo]?.n||e.tipo, d=detEv(e);
@@ -2132,11 +2137,11 @@ function editorClaves(E){
       <div class="kgrid">${HOJAS[s].map(([h,n])=>fld(n,`<input type="text" data-hclave="${s}.${h}" value="${esc((C.hojas||{})[s+"."+h]||"")}" autocapitalize="off" autocomplete="off" placeholder="Usa la de ${esc(l)}">`)).join("")}</div></div>`).join("")}`;
 }
 function renderSetup(){
-  return `<h1>Bienvenido</h1><p class="muted">Se configura una sola vez en este celular.</p>${esSamsung()?cardChrome(false):""}
+  return `<h1>Bienvenido</h1><p class="muted">Se configura una sola vez en este celular.</p><div id="inst-setup">${bannerInstalar()}</div>
   <div class="card">
     ${fld("Tu nombre",`<input type="text" id="su-op" value="${esc(S.set.operario)}" placeholder="Ej. Juan">`)}
     ${fld("Tu celular",`<input type="tel" id="su-cel" value="${esc(S.set.celular||"")}" placeholder="Ej. 2478 123456">`,"Para que el asesor sepa quién usa la app.")}
-    ${fld("Código de acceso",`<input type="text" id="su-cod" value="${esc(S.set.codigo)}" autocapitalize="off" placeholder="Te lo pasa el asesor">`)}
+    ${fld("Código de acceso",`<input type="text" id="su-cod" value="${esc(S.set.codigo)}" autocapitalize="off" placeholder="Opcional">`,"Si no lo tenés, lo cargás después en Ajustes. No hace falta para instalar.")}
     <details ${S.set.api?"":"open"}><summary>Servidor</summary>${fld("Dirección del servidor",`<input type="url" id="su-api" value="${esc(S.set.api)}" placeholder="https://script.google.com/macros/s/…/exec">`,"Si llegaste por el link que te mandaron ya viene cargada.")}</details>
     <button class="btn solid block" data-setup="1">Empezar</button>
   </div>`;
@@ -2163,7 +2168,7 @@ document.addEventListener("click", e=>{
   if(b.id==="btn-sync"){ sync(); toast(Object.keys(S.outbox).length?"Subiendo datos…":"Buscando novedades…"); return; }
   if(d.new){ nuevo(d.new); return; }
   if(d.instalar){ instalar(); return; }
-  if(d.codnuevo){ const v=($("#cod-nuevo").value||"").trim().toUpperCase(); if(!v){ toast("Escribí el código"); return; } S.set.codigo=v; S.codMal=false; S.syncState="idle"; persist(); render(); sync(); return; }
+  if(d.codnuevo){ let v=($("#cod-nuevo").value||"").trim(); if(/^[a-z]{3}-[a-z0-9]{4}$/i.test(v)) v=v.toUpperCase(); if(!v){ toast("Escribí el código"); return; } S.set.codigo=v; S.codMal=false; S.syncState="idle"; persist(); render(); sync(); return; }
   if(d.copylink){ const c=camposAdmin().find(x=>x.codigo===d.copylink); if(c) copiar(`App de rodeo de cría · ${c.nombre}\n${linkCampo(c)}`); return; }
   if(d.nuevocampo){ nuevoCampo(); return; }
   if(d.altabase && S.f){ const k=d.altabase, n=agregarBase(k,{nombre:($("#alta-n")||{}).value,raza:($("#alta-r")||{}).value,codigo:($("#alta-c")||{}).value}); if(n==null) return; S.f[BASES[k].campo]=n; S.f._alta=null; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
@@ -2173,8 +2178,8 @@ document.addEventListener("click", e=>{
   if(d.bajabase){ if(!armar(b,"¿Quitar? Tocá de nuevo")) return; const [k,id]=d.bajabase.split("|"), E=estab(); E[k]=(E[k]||[]).filter(x=>x.id!==id); saveEstab(E); S.basesAbiertas=true; toast("Quitado de la lista (las inseminaciones cargadas no cambian)"); const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(d.usract){ usrToggle(b,d.usract); return; }
   if(d.subirtodo){ if(!armar(b,"Tocá de nuevo para subir todo")) return; Object.keys(S.R).forEach(id=>S.outbox[id]=true); persist(); sync(); toast("Subiendo todo…"); render(); return; }
-  if(d.chromeno){ try{ localStorage.setItem("rc-chrome-no","1"); }catch(_){} render(); return; }
-  if(d.instno){ INST.oculto=true; try{ localStorage.setItem("rc-inst-no","1"); }catch(_){} toast("Lo podés instalar después desde Oficina → Ajustes"); render(); return; }
+  if(d.chromeno){ try{ localStorage.setItem("rc-chrome-no","1"); }catch(_){} refrescarInst(); return; }
+  if(d.instno){ INST.oculto=true; try{ localStorage.setItem("rc-inst-no","1"); }catch(_){} toast("Lo podés instalar después desde Oficina → Ajustes"); refrescarInst(); return; }
   if(d.back){ S.f=null; S.editId=null; S.view="home"; render(); return; }
   if(d.save){ guardar(); return; }
   if(d.edit){ editar(d.edit); return; }
