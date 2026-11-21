@@ -1000,6 +1000,7 @@ function renderBloqueado(){
 function renderEsperando(){
   return `<div class="card" style="text-align:center;padding:28px 18px"><h2 style="margin-top:0">Conectando con el servidor…</h2>
     <p class="muted">La primera vez con este código la app necesita señal para traer las claves y los datos del campo. Hasta entonces no se puede entrar a las secciones.</p>
+    ${S.syncState==="err"&&S.syncErr?`<p style="background:#FDECEC;color:#8a1f1f;border-radius:10px;padding:10px;font-size:14px">${S.codMal?"<b>El código no es válido.</b> Revisá el link o pedile el código al asesor.":"<b>No conecta:</b> "+esc(S.syncErr)}</p>`:""}
     <button class="btn solid" data-reintentar="1">Reintentar</button></div>`;
 }
 function renderHome(){
@@ -1585,7 +1586,7 @@ function hojaCompartir(file,blob,titulo,puede){
     <a class="btn solid hc-wa" data-hc="wa" href="whatsapp://send" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">2 · Abrir WhatsApp</a>
     <div class="muted" style="font-size:13px;line-height:1.4">En WhatsApp elegí el chat → clip 📎 → <b>Documento</b>: el archivo aparece primero en la lista.</div>${cardChrome(true)}`;
   h.innerHTML=`<div class="hc-fondo" data-hc="x"></div><div class="hc-caja">
-    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo <span class="muted" style="font-size:11px;font-weight:400">v48</span></b>
+    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo <span class="muted" style="font-size:11px;font-weight:400">v49</span></b>
     <div class="muted" style="font-size:13px;margin-bottom:12px;word-break:break-word">${esc(file.name)}</div>
     <div class="hc-cuerpo" style="display:flex;flex-direction:column;gap:10px">${directo?`<button class="btn solid hc-wa" data-hc="share">Compartir por WhatsApp</button><button class="btn" data-hc="dl">Descargar</button>`:pasos}</div>
     <div class="hc-info" hidden style="background:#FFF4D6;color:#5a4300;border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.35"></div>
