@@ -1560,18 +1560,22 @@ function hojaCompartir(file,blob,titulo,puede){
   cerrarHoja();
   const h=document.createElement("div"); h.id="hojaComp";
   h.innerHTML=`<div class="hc-fondo" data-hc="x"></div><div class="hc-caja">
-    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo <span class="muted" style="font-size:11px;font-weight:400">v45</span></b>
+    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo <span class="muted" style="font-size:11px;font-weight:400">v46</span></b>
     <div class="muted" style="font-size:13px;margin-bottom:12px;word-break:break-word">${esc(file.name)}</div>
     ${puede?`<button class="btn solid hc-wa" data-hc="share">Compartir por WhatsApp</button>`:`<div class="muted" style="font-size:13px;margin-bottom:10px">Este navegador no deja mandar archivos directo. Descargalo y en WhatsApp tocá el clip → Documento.${navInterno()?` Si abriste la app desde WhatsApp, abrila en ${esIOS()?"Safari":"Chrome"} para compartir directo.`:""}</div>`}
+    <div class="hc-info" hidden style="background:#FFF4D6;color:#5a4300;border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.35"></div>
     <button class="btn" data-hc="dl">Descargar</button>
     ${puede?"":`<a class="btn" href="https://wa.me/" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">Abrir WhatsApp</a>`}
     <button class="btn hc-x" data-hc="x">Cerrar</button></div>`;
   h.addEventListener("click",async ev=>{ const k=ev.target.closest("[data-hc]"); if(!k) return; const a=k.dataset.hc;
     if(a==="x") return cerrarHoja();
-    if(a==="dl"){ descargarArch(blob,file.name); toast("Descargado. En WhatsApp: clip → Documento."); return; }
-    if(a==="share"){ const r=await compartirArch(file,titulo); if(r==="ok") cerrarHoja(); else if(r==="error") toast("No se pudo compartir ("+errComp+"). Tocá Descargar",9000); } });
+    const info=h.querySelector(".hc-info");
+    if(a==="dl"){ try{ descargarArch(blob,file.name); k.textContent="✓ Descargado"; info.innerHTML=`Quedó en la carpeta <b>Descargas</b> del celular. En WhatsApp: clip → Documento → buscalo ahí.`; }catch(err){ info.textContent="No se pudo descargar: "+(err&&err.message||err); } info.hidden=false; return; }
+    if(a==="share"){ k.textContent="Abriendo…"; const r=await compartirArch(file,titulo); k.textContent="Compartir por WhatsApp";
+      if(r==="ok") cerrarHoja(); else if(r==="error"){ info.innerHTML=`<b>No se pudo compartir.</b> Tocá Descargar.<br><small>${esc(errComp)} · ${esc(diagNav())}</small>`; info.hidden=false; } } });
   document.body.appendChild(h);
 }
+const diagNav=()=>`${(matchMedia("(display-mode: standalone)").matches?"app instalada":"navegador")} · ${(navigator.userAgent.match(/(SamsungBrowser|EdgA|Firefox|OPR|Chrome|Version)\/[\d]+/)||[""])[0]}${navInterno()?" · webview":""}`;
 function cerrarHoja(){ const h=document.getElementById("hojaComp"); if(h) h.remove(); }
 async function compartirInforme(key,fmt){
   toast(fmt==="pdf"?"Armando el PDF…":"Armando el Excel…");
