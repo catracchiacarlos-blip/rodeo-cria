@@ -1063,6 +1063,23 @@ const esIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.
 const navInterno = () => /WhatsApp|FBAN|FBAV|Instagram|Line\/|wv\)/i.test(navigator.userAgent);
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); INST.evento=e; if(S.view!=="setup") render(); });
 window.addEventListener("appinstalled", () => { INST.evento=null; toast("App instalada. Ya abre sin señal."); render(); });
+/* Samsung Internet no deja mandar archivos a WhatsApp: se ofrece pasar la app a Chrome con un toque (lleva la configuración) */
+const esSamsung = () => /SamsungBrowser/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
+function linkChrome(){
+  const q=new URLSearchParams();
+  if(S.set.codigo) q.set("codigo",S.set.codigo); if(S.set.estab) q.set("estab",S.set.estab);
+  if(S.set.operario) q.set("op",S.set.operario); if(S.set.celular) q.set("cel",S.set.celular);
+  q.set("deSamsung","1");
+  const web=location.origin+location.pathname+"?"+q.toString();
+  return `intent://${location.host}${location.pathname}?${q.toString()}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(web)};end`;
+}
+const pendientes = () => Object.keys(S.outbox||{}).length;
+function cardChrome(dentroHoja){
+  if(!esSamsung()) return "";
+  const p=pendientes();
+  return `<div class="${dentroHoja?"":"card "}noinf" style="${dentroHoja?"":"border:2px solid #25D366"}"><p style="margin:0 0 10px;font-size:15px;line-height:1.4"><b>Pasá la app a Chrome</b> para mandar los PDF por WhatsApp con un solo toque (el navegador de Samsung no lo permite). Se abre ya configurada; ahí tocá <b>Instalar</b>.${p?`<br><span style="color:#C98A00">Antes esperá que suban los ${p} registros pendientes (arriba tiene que decir "Al día").</span>`:""}</p>
+    ${p?"":`<a class="btn solid" href="${esc(linkChrome())}" style="background:#25D366;border-color:#25D366;display:flex;align-items:center;justify-content:center;text-decoration:none">Abrir en Chrome</a>`}</div>`;
+}
 function textoInstalar(){
   if(instalada()) return `<b>La app ya está instalada en este celular.</b> Abre sin señal y lo que cargues se sube solo cuando vuelve la conexión.`;
   if(navInterno()) return `<b>Para instalarla, abrí este link en ${esIOS()?"Safari":"Chrome"}.</b> Desde WhatsApp tocá los tres puntos (o el ícono de compartir) → "Abrir en el navegador".`;
@@ -1071,6 +1088,7 @@ function textoInstalar(){
   return `<b>Instalá la app en el celular:</b> en Chrome tocá el menú ⋮ → <b>"Instalar aplicación"</b> o <b>"Agregar a pantalla principal"</b>.`;
 }
 function bannerInstalar(){
+  if(esSamsung()){ let no=false; try{ no=localStorage.getItem("rc-chrome-no")==="1"; }catch(_){} if(!no) return cardChrome(false).replace(/<\/div>$/,`<button class="btn" data-chromeno="1" style="margin-top:8px">Ahora no</button></div>`); }
   if(instalada() || INST.oculto || (esCompu() && !INST.evento)) return "";
   return `<div class="card" style="border:2px solid var(--acc)"><p style="margin:0 0 10px">${textoInstalar()}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${INST.evento?`<button class="btn solid" data-instalar="1">Instalar</button>`:""}<button class="btn" data-instno="1">Ahora no</button></div></div>`;
@@ -1565,9 +1583,9 @@ function hojaCompartir(file,blob,titulo,puede){
   const h=document.createElement("div"); h.id="hojaComp";
   const pasos=`<button class="btn solid hc-wa" data-hc="dl">1 · Descargar ${ext}</button>
     <a class="btn solid hc-wa" data-hc="wa" href="whatsapp://send" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">2 · Abrir WhatsApp</a>
-    <div class="muted" style="font-size:13px;line-height:1.4">En WhatsApp elegí el chat → clip 📎 → <b>Documento</b>: el archivo aparece primero en la lista.${/SamsungBrowser/.test(navigator.userAgent)?" (El navegador de Samsung no deja mandarlo directo; desde Chrome sale con un solo toque.)":""}</div>`;
+    <div class="muted" style="font-size:13px;line-height:1.4">En WhatsApp elegí el chat → clip 📎 → <b>Documento</b>: el archivo aparece primero en la lista.</div>${cardChrome(true)}`;
   h.innerHTML=`<div class="hc-fondo" data-hc="x"></div><div class="hc-caja">
-    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo <span class="muted" style="font-size:11px;font-weight:400">v47</span></b>
+    <b style="display:block;font-size:17px;margin-bottom:2px">Archivo listo <span class="muted" style="font-size:11px;font-weight:400">v48</span></b>
     <div class="muted" style="font-size:13px;margin-bottom:12px;word-break:break-word">${esc(file.name)}</div>
     <div class="hc-cuerpo" style="display:flex;flex-direction:column;gap:10px">${directo?`<button class="btn solid hc-wa" data-hc="share">Compartir por WhatsApp</button><button class="btn" data-hc="dl">Descargar</button>`:pasos}</div>
     <div class="hc-info" hidden style="background:#FFF4D6;color:#5a4300;border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.35"></div>
@@ -2113,7 +2131,7 @@ function editorClaves(E){
       <div class="kgrid">${HOJAS[s].map(([h,n])=>fld(n,`<input type="text" data-hclave="${s}.${h}" value="${esc((C.hojas||{})[s+"."+h]||"")}" autocapitalize="off" autocomplete="off" placeholder="Usa la de ${esc(l)}">`)).join("")}</div></div>`).join("")}`;
 }
 function renderSetup(){
-  return `<h1>Bienvenido</h1><p class="muted">Se configura una sola vez en este celular.</p>
+  return `<h1>Bienvenido</h1><p class="muted">Se configura una sola vez en este celular.</p>${esSamsung()?cardChrome(false):""}
   <div class="card">
     ${fld("Tu nombre",`<input type="text" id="su-op" value="${esc(S.set.operario)}" placeholder="Ej. Juan">`)}
     ${fld("Tu celular",`<input type="tel" id="su-cel" value="${esc(S.set.celular||"")}" placeholder="Ej. 2478 123456">`,"Para que el asesor sepa quién usa la app.")}
@@ -2154,6 +2172,7 @@ document.addEventListener("click", e=>{
   if(d.bajabase){ if(!armar(b,"¿Quitar? Tocá de nuevo")) return; const [k,id]=d.bajabase.split("|"), E=estab(); E[k]=(E[k]||[]).filter(x=>x.id!==id); saveEstab(E); S.basesAbiertas=true; toast("Quitado de la lista (las inseminaciones cargadas no cambian)"); const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(d.usract){ usrToggle(b,d.usract); return; }
   if(d.subirtodo){ if(!armar(b,"Tocá de nuevo para subir todo")) return; Object.keys(S.R).forEach(id=>S.outbox[id]=true); persist(); sync(); toast("Subiendo todo…"); render(); return; }
+  if(d.chromeno){ try{ localStorage.setItem("rc-chrome-no","1"); }catch(_){} render(); return; }
   if(d.instno){ INST.oculto=true; try{ localStorage.setItem("rc-inst-no","1"); }catch(_){} toast("Lo podés instalar después desde Oficina → Ajustes"); render(); return; }
   if(d.back){ S.f=null; S.editId=null; S.view="home"; render(); return; }
   if(d.save){ guardar(); return; }
@@ -2328,6 +2347,9 @@ async function init(){
   if(qs.get("api")) S.set.api=qs.get("api");
   if(qs.get("codigo")) S.set.codigo=qs.get("codigo");
   if(qs.get("estab")) S.set.estab=slug(qs.get("estab"));
+  if(qs.get("op")&&!S.set.operario) S.set.operario=qs.get("op");
+  if(qs.get("cel")&&!S.set.celular) S.set.celular=qs.get("cel");
+  if(qs.get("deSamsung")) setTimeout(()=>toast("Listo, ya estás en Chrome. Tocá Instalar para dejarla en el celular.",6000),800);
   if(!S.set.api && API_DEFAULT) S.set.api=API_DEFAULT;
   if(!S.set.estab) S.set.estab=ESTAB_DEFAULT.id;
   if(!S.set.usrId) S.set.usrId=uid();
