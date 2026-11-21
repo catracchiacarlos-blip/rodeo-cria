@@ -262,7 +262,7 @@ const num = v => { if(v===""||v==null) return null; const n=parseFloat(String(v)
 const pct = (a,b) => b>0 ? a/b*100 : null;
 const f1 = v => v==null||isNaN(v) ? "—" : (Math.round(v*10)/10).toLocaleString("es-AR");
 const f0 = v => v==null||isNaN(v) ? "—" : Math.round(v).toLocaleString("es-AR");
-const APP_VER = "rc-v42";
+const APP_VER = "rc-v43";
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
 const slug = s => norm(s).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || uid();
 function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,2600); }
@@ -1018,7 +1018,7 @@ function renderHome(){
     <h2>Hoy</h2>
     <div class="card">${partos.length?`<div class="chips" style="margin-bottom:8px"><span class="chip ok">${partos.length} partos</span><span class="chip">${partos.filter(p=>p.sexo==="M").length} M</span><span class="chip">${partos.filter(p=>p.sexo==="H").length} H</span>${partos.filter(p=>p.estado==="muerto").length?`<span class="chip bad">${partos.filter(p=>p.estado==="muerto").length} muertos</span>`:""}</div>`:""}
       ${hoyEv.length?`<div class="list">${hoyEv.sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,12).map(rowEv).join("")}</div>`:`<p class="muted" style="margin:0">Todavía no cargaste nada hoy.</p>`}
-      ${hoyEv.length?`<button class="btn block" style="margin-top:10px" data-share="hoy">Copiar resumen del día</button><button class="btn block" style="margin-top:10px" data-pdf="hoy">Descargar PDF</button>`:""}
+      ${hoyEv.length?btnsInf("hoy"):""}
     </div>`;
   if(S.tab==="manga") return `${banners()}
     <h1>Manga</h1>
@@ -1298,7 +1298,7 @@ function stockCard(){
       <div class="list" style="margin-top:6px">${k.fuera.map(({e,l,motivo})=>`<div class="item"><span class="grow"><b>${e.tipo==="muerte"?"Muerte":(MOVS.find(m=>m[0]===e.mov)||["",e.mov])[1]} · ${f0(num(e.cabezas)||1)} cab${e.categoria?" "+esc(e.categoria):""}</b><span class="small muted" style="display:block">${fmtDT(e.fecha)}${e.destino?" · "+esc(e.destino):""} · ${motivo==="antes"?`cargado antes del conteo del lote ${esc(l.nombre)} (${fmtDT(l.stockTs)})`:"sin lote: baja el total pero no el lote"}</span></span>${motivo==="antes"?`<button class="chip ok" data-stkantes="${e.id}">Descontar</button>`:""}<button class="chip" data-edit="${e.id}">Editar</button></div>`).join("")}</div>
       <p class="small muted" style="margin:6px 0 0">"Descontar" pasa la fecha del conteo del lote a justo antes del movimiento. Si el conteo ya lo tenía descontado, no lo toques. "Sin lote": tocá Editar y elegí el lote.</p></div>`:""}
     <p class="small muted" style="margin:8px 0 0">Actual = conteo del lote + nacimientos (partos vivos) + entradas − muertes − salidas cargadas después de la fecha del conteo. Al volver a contar, actualizá las cabezas del lote: la fecha del conteo pasa a ser ese día.</p>
-    <button class="btn" data-share="stock" style="margin-top:10px">Copiar para WhatsApp</button><button class="btn" data-pdf="stock" style="margin-top:10px">Descargar PDF</button></div>`;
+    ${btnsInf("stock")}</div>`;
 }
 function renderResumen(){
   if(!S.filt){ S.filt={tipos:["parto"], desde:"", hasta:"", grupo:"dia"}; }
@@ -1328,7 +1328,7 @@ function renderResumen(){
   <div class="kpis">${cols.map(([k,l,fn])=>`<div class="kpi"><span>${l}</span><b>${fn(rs)}</b></div>`).join("")}</div>
   ${g&&keys.length?`<div class="card scroll"><table><thead><tr><th>${esc(g)}</th>${cols.map(c=>`<th>${c[1]}</th>`).join("")}</tr></thead><tbody>${keys.map(k=>`<tr><td>${esc(k)}</td>${cols.map(c=>`<td>${c[2](grupos[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:""}
   ${g&&keys.length>1&&keys.length<=40?`<div class="card">${barras(keys.map(k=>[k,grupos[k].length]))}</div>`:""}
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" data-share="filt">Copiar para WhatsApp</button><button class="btn" data-pdf="filt">Descargar PDF</button><button class="btn" data-csv="1">Descargar planilla (CSV)</button></div>
+  ${btnsInf("filt")}<div style="display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 12px"><button class="btn" data-csv="1">Descargar planilla (CSV)</button></div>
   <div class="card"><h3 style="margin-top:0">${rs.length} registros</h3><div class="list">${rs.slice(0,60).map(rowEv).join("")}</div>${rs.length>60?`<p class="small muted">Se muestran los últimos 60. Descargá la planilla para ver todo.</p>`:""}</div>`;
 }
 function barras(pares){
@@ -1344,6 +1344,221 @@ function textoResumen(rs,titulo){
   return t.replace(/\n+$/,"");
 }
 async function copiar(txt){ try{ await navigator.clipboard.writeText(txt); toast("Copiado. Pegalo en WhatsApp."); }catch(_){ S.copyTxt=txt; render(); window.scrollTo(0,0); } }
+/* ----- informes APSAVET: PDF y Excel para compartir por WhatsApp ----- */
+const MARCA={petroleo:"#063537",turquesa:"#17BEBB",oscuro:"#0A6E6C",claro:"#E8F7F6",linea:"#D9E3E1",gris:"#5E7273",ok:"#2E9E5B",warn:"#C98A00",bad:"#D64545"};
+const INF_TIT={nov:"Novedades",rec:"Recuentos de hacienda",hoy:"Resumen del día",filt:"Resumen",stock:"Stock",lotes:"Indicadores por lote",camp:"Indicadores de la campaña",idx:"Índices de eficiencia"};
+const txtLimpio=el=>(el?el.textContent:"").replace(/\s+/g," ").trim();
+const estadoDe=el=>{ const c=el&&(el.matches&&el.matches(".ok,.warn,.bad")?el:el.querySelector(".chip.ok,.chip.warn,.chip.bad,.kpi.ok,.kpi.warn,.kpi.bad")); return !c?"":c.classList.contains("ok")?"ok":c.classList.contains("warn")?"warn":c.classList.contains("bad")?"bad":""; };
+/* lee lo que muestra una pantalla (títulos, tarjetas de indicadores y tablas) y lo pasa a bloques del informe */
+function leerPantalla(html){
+  const root=document.createElement("div"); root.innerHTML=html; const B=[];
+  const SKIP=".noinf,.banner,details,button,input,select,textarea,.field,p,.chips,.bar,.back,.serie";
+  const walk=el=>{ for(const n of el.children){
+    if(n.matches(SKIP)) continue;
+    if(n.matches("h1")) continue;
+    if(n.matches("h2,h3,.lbl")){ B.push({h:txtLimpio(n)}); continue; }
+    if(n.matches(".kpis")){ B.push({kpis:[...n.querySelectorAll(".kpi")].map(k=>({l:txtLimpio(k.querySelector("span")),v:txtLimpio(k.querySelector("b")),sub:txtLimpio(k.querySelector("small")),s:estadoDe(k)}))}); continue; }
+    if(n.matches("table")){ const cols=[...n.querySelectorAll("thead th")].map(txtLimpio);
+      const filas=[...n.querySelectorAll("tbody tr")].map(tr=>[...tr.children].map(td=>{ const b=td.querySelector("b"), mu=[...td.querySelectorAll(".muted")].map(txtLimpio).filter(Boolean).join(" · "), falta=[...td.querySelectorAll(".chip.warn")].filter(x=>/^Falta/.test(txtLimpio(x))).map(txtLimpio).join(" · ");
+        const s=estadoDe(td); let t=txtLimpio(td);
+        if(b&&(mu||falta)&&td.querySelector("br")) return {t:txtLimpio(b),sub:[mu,falta].filter(Boolean).join(" · ")};
+        return s?{t,s}:t; }));
+      if(filas.some(f=>f[0]&&typeof f[0]==="object"&&f[0].sub!=null)){ cols.push("Cálculo"); filas.forEach(f=>{ const c=f[0]&&typeof f[0]==="object"?f[0]:{t:celdaT(f[0])}; while(f.length<cols.length-1) f.push(""); f[0]=c.t; f.push({t:c.sub||"",nota:1}); }); }
+      B.push({tabla:{cols,filas}}); continue; }
+    walk(n);
+  } };
+  walk(root);
+  return B.filter((b,i)=>!b.h||(B[i+1]&&!B[i+1].h));   // títulos sin contenido abajo, fuera
+}
+const celdaT=c=>c==null?"":typeof c==="object"?c.t:String(c);
+function informe(key){
+  const E=estab(), hoy=todayStr(); let tit=INF_TIT[key]||"Informe", sub="", B=[];
+  const lo=()=>{ const o=loteSelObj(); return o?` · ${o.varios?"lotes":"lote"} ${o.n}`:""; };
+  if(key==="stock"){ sub=`Al ${fmtD(hoy)}`; B=leerPantalla(stockCard()); if(B[0]&&B[0].h&&/^Stock/.test(B[0].h)) B.shift(); }
+  else if(key==="camp"){ sub=`Campaña ${S.campSel}/${String(S.campSel+1).slice(2)}${lo()}`; B=leerPantalla(renderIndicadores()); }
+  else if(key==="idx"){ sub=`Campaña ${S.campSel}/${String(S.campSel+1).slice(2)}${lo()}`; B=leerPantalla(renderIndices()); }
+  else if(key==="lotes"){ const P=S.loteP||{}; sub=P.desde||P.hasta?`${P.desde?"Desde "+fmtD(P.desde):""}${P.hasta?(P.desde?" hasta ":"Hasta ")+fmtD(P.hasta):""}`:"Todo lo cargado";
+    B=[{tabla:{cols:["Lote","Vientres","Partos","% parición","Partos/día","Últ. 7 días","Peso nac. (kg)","Mort. perinatal %","Mort. terneros %","Mort. adultos %","Preñez %","Cab/ha"],
+      filas:lotesE(E).map(l=>{ const k=calcLote(l,P.desde,P.hasta); return [l.nombre,f0(k.vientres),f0(k.partos),f1(k.paricion),f1(k.ritmo),f0(k.ult7),f1(k.pesoNac),f1(k.mortPeri),f1(k.mortTern),f1(k.mortAd),f1(k.prenez),f1(k.carga)]; })}}];
+    const k=stockCalc(E), M=stockMatriz(k);
+    if(M.cols.length) B.push({h:"Cabezas actuales por lote y categoría"},{tabla:{cols:["Lote",...M.cols.map(r=>r.c.nombre),"Total"],filas:[...M.filas.map(f=>[f.x.l.nombre,...f.v.map(v=>v?f0(v):""),f0(f.x.actual)]),["Total",...M.cols.map(r=>f0(r.actual)),f0(k.tot)]]}}); }
+  else if(key==="nov"){ const p=perNov(), L=novedadesDe(p[0]), cnt={}; L.forEach(e=>{ const c=e.categoria||"Sin tipo"; cnt[c]=(cnt[c]||0)+1; });
+    tit="Novedades"; sub=p[1];
+    B=[{kpis:[{l:"Novedades",v:f0(L.length)},...Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([c,n])=>({l:c,v:f0(n)}))]}];
+    B.push(L.length?{tabla:{cols:["Fecha","Novedad","Lote","Potrero","Detalle","Cargó"],filas:L.map(e=>[fmtDT(e.fecha),e.categoria||"Novedad",e.lote||"",e.potrero||"",e.obs||"",e.operario||""])}}:{h:"Sin novedades en "+p[1].toLowerCase()}); }
+  else if(key==="rec"){ const L=recuentosDe(S.recMes);
+    tit="Recuentos de hacienda"; sub=S.recMes?mesTxt(S.recMes):"Todos los recuentos";
+    B=[{kpis:[{l:"Recuentos",v:f0(L.length)},{l:"Lotes contados",v:f0(new Set(L.map(e=>e.loteId||e.lote)).size)}]},
+       {tabla:{cols:["Fecha","Lote","Cabezas","Detalle por categoría","Cargó"],filas:L.map(e=>[fT(e.fecha),e.lote||"",f0(num(e.cabezas)||0),e.detalle||"",e.operario||(e.virtual?"conteo del lote":"")])}}]; }
+  else {
+    const esHoy=key==="hoy", F=S.filt||{tipos:[]}, rs=esHoy?eventos().filter(x=>(x.fecha||"").startsWith(hoy)):filtrar(F), cols=metricas(rs);
+    if(esHoy) sub=fmtD(hoy);
+    else { const T=(F.tipos||[]).map(t=>TIPOS[t]?.pl||t).join(", "), ls=[...(F.lotes||[]),...(F.lote?[F.lote]:[])];
+      sub=[S.why&&S.why.length?S.why.join(", "):T, F.desde||F.hasta?`${F.desde?fmtD(F.desde):"…"} a ${F.hasta?fmtD(F.hasta):"hoy"}`:"", F.potrero?"potrero "+F.potrero:"", ls.length?"lotes "+ls.join(", "):""].filter(Boolean).join(" · "); }
+    B.push({kpis:cols.map(([k,l,fn])=>({l,v:String(fn(rs))}))});
+    const g=!esHoy&&F.grupo;
+    if(g){ const gr={}; rs.forEach(e=>{ const k=claveGrupo(e,g); (gr[k]=gr[k]||[]).push(e); }); const ks=ordenar(Object.keys(gr));
+      const nom=({dia:"Día",semana:"Semana",mes:"Mes",campana:"Campaña"})[g]||g.charAt(0).toUpperCase()+g.slice(1);
+      if(ks.length) B.push({h:"Por "+nom.toLowerCase()},{tabla:{cols:[nom,...cols.map(c=>c[1])],filas:[...ks.map(k=>[k,...cols.map(c=>String(c[2](gr[k])))]),["Total",...cols.map(c=>String(c[2](rs)))]]}}); }
+    if(rs.length) B.push({h:`Registros (${rs.length})`},{tabla:{cols:["Fecha","Tipo","Lote","Potrero","Detalle","Cargó"],filas:rs.map(e=>[fmtDT(e.fecha),TIPOS[e.tipo]?.n||e.tipo,e.lote||"",e.potrero||"",detEv(e).trim(),e.operario||""])}});
+    else B.push({h:"Sin registros para mostrar"});
+  }
+  return {key,tit,sub,estab:E.nombre,fecha:hoy,B};
+}
+/* ----- carga perezosa de jsPDF (queda guardado en el celular para usar sin señal) ----- */
+function cargarJs(src){ return new Promise((ok,mal)=>{ if(document.querySelector(`script[src="${src}"]`)&&cargarJs.ok[src]) return ok(); const s=document.createElement("script"); s.src=src; s.onload=()=>{ cargarJs.ok[src]=1; ok(); }; s.onerror=()=>mal(new Error("No se pudo cargar "+src)); document.head.appendChild(s); }); }
+cargarJs.ok={};
+async function libPdf(){ if(!(window.jspdf&&window.jspdf.jsPDF)) await cargarJs("lib/jspdf.umd.min.js"); if(!cargarJs.ok["lib/jspdf.plugin.autotable.min.js"]) await cargarJs("lib/jspdf.plugin.autotable.min.js"); return window.jspdf.jsPDF; }
+const pdfTxt=s=>String(s==null?"":s).replace(/≥/g,">=").replace(/≤/g,"<=").replace(/→/g,"->").replace(/[−–]/g,"-").replace(/＋/g,"+").replace(/[^\x00-\xFF€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•—˜™š›œžŸ]/g,"");
+const rgb=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+async function informePdf(inf){
+  const jsPDF=await libPdf(), W=210, H=297, m=14;
+  const ancho=inf.B.some(b=>b.tabla&&b.tabla.cols.length>8);
+  const pdf=new jsPDF({unit:"mm",format:"a4",orientation:ancho?"landscape":"portrait"}), PW=ancho?H:W, PH=ancho?W:H;
+  const at=(o)=>{ if(typeof pdf.autoTable==="function") pdf.autoTable(o); else window.jspdf.autoTable?window.jspdf.autoTable(pdf,o):window.jspdf_autotable.default(pdf,o); return pdf.lastAutoTable.finalY; };
+  const encab=()=>{
+    pdf.setFillColor(...rgb(MARCA.petroleo)); pdf.rect(0,0,PW,24,"F");
+    pdf.setFillColor(...rgb(MARCA.turquesa)); pdf.rect(0,24,PW,1.4,"F");
+    pdf.setFont("helvetica","bold"); pdf.setFontSize(21); pdf.setTextColor(255,255,255); pdf.text("APSA",m,13.5);
+    const w=pdf.getTextWidth("APSA"); pdf.setTextColor(...rgb(MARCA.turquesa)); pdf.text("VET",m+w+1.2,13.5);
+    pdf.setFont("helvetica","normal"); pdf.setFontSize(7.5); pdf.setTextColor(190,232,231); pdf.text("Asesoramiento en Producción y Salud Animal",m,19);
+    pdf.setFont("helvetica","bold"); pdf.setFontSize(11); pdf.setTextColor(255,255,255); pdf.text(pdfTxt(inf.estab),PW-m,12,{align:"right"});
+    pdf.setFont("helvetica","normal"); pdf.setFontSize(8.5); pdf.setTextColor(190,232,231); pdf.text("Rodeo de cría",PW-m,18,{align:"right"});
+  };
+  encab();
+  let y=36;
+  pdf.setFont("helvetica","bold"); pdf.setFontSize(17); pdf.setTextColor(...rgb(MARCA.petroleo)); pdf.text(pdfTxt(inf.tit),m,y);
+  if(inf.sub){ y+=6; pdf.setFont("helvetica","normal"); pdf.setFontSize(10); pdf.setTextColor(...rgb(MARCA.gris)); pdf.splitTextToSize(pdfTxt(inf.sub),PW-2*m).forEach((ln,i)=>pdf.text(ln,m,y+i*4.5)); y+=4.5*(pdf.splitTextToSize(inf.sub,PW-2*m).length-1); }
+  y+=7;
+  const nuevaPag=need=>{ if(y+need>PH-16){ pdf.addPage(); encab(); y=34; } };
+  const colEst=s=>s?rgb(MARCA[s]):null;
+  for(const b of inf.B){
+    if(b.h){ nuevaPag(16); pdf.setFillColor(...rgb(MARCA.turquesa)); pdf.rect(m,y-4,1.6,5.6,"F"); pdf.setFont("helvetica","bold"); pdf.setFontSize(12); pdf.setTextColor(...rgb(MARCA.petroleo)); pdf.text(pdfTxt(b.h),m+4,y); y+=5; }
+    else if(b.kpis){ const n=ancho?6:4, gap=3, kw=(PW-2*m-gap*(n-1))/n, kh=b.kpis.some(k=>k.sub)?21:16;
+      b.kpis.forEach((k,i)=>{ const c=i%n; if(c===0){ if(i) y+=kh+gap; nuevaPag(kh+2); } const x=m+c*(kw+gap);
+        pdf.setFillColor(...rgb(MARCA.claro)); pdf.setDrawColor(...rgb(MARCA.linea)); pdf.roundedRect(x,y,kw,kh,1.8,1.8,"FD");
+        pdf.setFillColor(...(colEst(k.s)||rgb(MARCA.turquesa))); pdf.rect(x,y+1.5,1.3,kh-3,"F");
+        pdf.setFont("helvetica","normal"); pdf.setFontSize(7.5); pdf.setTextColor(...rgb(MARCA.gris)); pdf.text(pdf.splitTextToSize(pdfTxt(k.l),kw-6)[0],x+4,y+5);
+        pdf.setFont("helvetica","bold"); pdf.setFontSize(14); pdf.setTextColor(...(colEst(k.s)||rgb(MARCA.petroleo))); pdf.text(pdfTxt(k.v||"—"),x+4,y+12);
+        if(k.sub){ pdf.setFont("helvetica","normal"); pdf.setFontSize(6.5); pdf.setTextColor(...rgb(MARCA.gris)); pdf.splitTextToSize(pdfTxt(k.sub),kw-6).slice(0,2).forEach((ln,j)=>pdf.text(ln,x+4,y+16+j*2.8)); }
+      }); y+=kh+6; }
+    else if(b.tabla){ const T=b.tabla, tot=T.filas.length&&/^total/i.test(celdaT(T.filas[T.filas.length-1][0]));
+      const reg=T.cols.some(c=>/^Detalle/.test(c)), body=T.filas.map(f=>f.map(c=>c&&typeof c==="object"?{content:pdfTxt(c.t),_s:c.s,_n:c.nota}:pdfTxt(c)));
+      y=at({startY:y,head:[T.cols.map(pdfTxt)],body,margin:{left:m,right:m,top:32,bottom:16},theme:"grid",
+        styles:{font:"helvetica",fontSize:T.cols.length>8?7:8.5,cellPadding:1.8,lineColor:rgb(MARCA.linea),lineWidth:0.2,textColor:[27,46,48],valign:"middle"},
+        headStyles:{fillColor:rgb(MARCA.petroleo),textColor:255,fontStyle:"bold",halign:"center"},
+        alternateRowStyles:{fillColor:[244,250,250]},
+        columnStyles:{0:{halign:"left",fontStyle:"bold"}},
+        didParseCell:d=>{ if(d.section!=="body") return; const raw=d.cell.raw;
+          if(!reg&&d.column.index>0&&/^([+\-]?[\d.,]+\s*%?|—)$/.test(celdaT(raw&&raw.content!==undefined?raw.content:raw))) d.cell.styles.halign="right";
+          if(raw&&raw._n){ d.cell.styles.fontSize=7; d.cell.styles.textColor=rgb(MARCA.gris); }
+          if(raw&&raw._s){ d.cell.styles.textColor=rgb(MARCA[raw._s]); d.cell.styles.fontStyle="bold"; }
+          if(tot&&d.row.index===T.filas.length-1){ d.cell.styles.fillColor=rgb("#D6F2F1"); d.cell.styles.fontStyle="bold"; } },
+        willDrawPage:d=>{ if(d.pageNumber>1) encab(); }
+      })+7; }
+  }
+  const n=pdf.getNumberOfPages();
+  for(let i=1;i<=n;i++){ pdf.setPage(i); pdf.setDrawColor(...rgb(MARCA.turquesa)); pdf.setLineWidth(0.4); pdf.line(m,PH-11,PW-m,PH-11);
+    pdf.setFont("helvetica","normal"); pdf.setFontSize(7.5); pdf.setTextColor(...rgb(MARCA.gris));
+    pdf.text(pdfTxt(`APSAVET · Rodeo de cría · ${inf.estab} · generado el ${fmtD(inf.fecha)}${S.set.operario?" por "+S.set.operario:""}`),m,PH-6.5);
+    pdf.text(`Página ${i} de ${n}`,PW-m,PH-6.5,{align:"right"}); }
+  return pdf.output("blob");
+}
+/* ----- Excel (.xlsx) armado a mano: sin librerías, abre en Excel, Google Sheets y el celular ----- */
+const xEsc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,"");
+const aNum=s=>{ if(typeof s==="number") return s; s=String(s).trim().replace(/^−/,"-").replace(/\s*%$/,""); if(!/^[+-]?\d{1,3}(\.\d{3})*(,\d+)?$|^[+-]?\d+(,\d+)?$/.test(s)) return null; return Number(s.replace(/\./g,"").replace(",",".")); };
+function crc32(b){ let c,t=crc32.t; if(!t){ t=crc32.t=new Uint32Array(256); for(let n=0;n<256;n++){ c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } } c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c=t[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zipGuardar(files){   // zip sin compresión (método "store")
+  const enc=new TextEncoder(), partes=[], central=[]; let off=0;
+  const u16=v=>[v&255,(v>>8)&255], u32=v=>[v&255,(v>>8)&255,(v>>16)&255,(v>>>24)&255];
+  for(const [nombre,txt] of files){ const n=enc.encode(nombre), d=enc.encode(txt), crc=crc32(d);
+    const loc=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(d.length),...u32(d.length),...u16(n.length),...u16(0)]);
+    partes.push(loc,n,d);
+    central.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(d.length),...u32(d.length),...u16(n.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),n);
+    off+=loc.length+n.length+d.length; }
+  const tam=central.reduce((a,x)=>a+x.length,0);
+  const fin=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(tam),...u32(off),...u16(0)]);
+  return new Blob([...partes,...central,fin],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+function informeXlsx(inf){
+  // estilos: 1 título, 2 subtítulo, 3 encabezado tabla, 4 texto, 5 entero, 6 decimal, 7 total texto, 8 total entero, 9 total decimal, 10 sección, 11 nota, 12 etiqueta indicador, 13 ok, 14 warn, 15 bad
+  const filas=[], merges=[]; let r=0; const ncol=Math.max(4,...inf.B.filter(b=>b.tabla).map(b=>b.tabla.cols.length));
+  const col=i=>{ let s=""; i++; while(i){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=(i-m-1)/26; } return s; };
+  const fila=(celdas,alto)=>{ r++; filas.push(`<row r="${r}"${alto?` ht="${alto}" customHeight="1"`:""}>`+celdas.map((c,i)=>{ if(c==null) return ""; const ref=col(i)+r; const [v,st]=c;
+    if(v===""||v==null) return `<c r="${ref}" s="${st}"/>`;
+    if(typeof v==="number") return `<c r="${ref}" s="${st}"><v>${v}</v></c>`;
+    return `<c r="${ref}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${xEsc(v)}</t></is></c>`; }).join("")+`</row>`); };
+  const W=new Array(ncol).fill(10);
+  const largo=(i,t)=>{ W[i]=Math.min(45,Math.max(W[i],String(t).length*1.1+2)); };
+  fila([["APSAVET · Rodeo de cría",1],...Array(ncol-1).fill(["",1])],26); merges.push(`A${r}:${col(ncol-1)}${r}`);
+  fila([[`${inf.estab} · ${inf.tit}`,2]],20); merges.push(`A${r}:${col(ncol-1)}${r}`);
+  if(inf.sub){ fila([[inf.sub,11]]); merges.push(`A${r}:${col(ncol-1)}${r}`); }
+  fila([[`Generado el ${fmtD(inf.fecha)}${S.set.operario?" por "+S.set.operario:""}`,11]]); merges.push(`A${r}:${col(ncol-1)}${r}`);
+  for(const b of inf.B){
+    if(b.h){ fila([]); fila([[b.h,10]],18); }
+    else if(b.kpis){ fila([]); fila([["Indicador",3],["Valor",3],...(b.kpis.some(k=>k.sub)?[["Detalle",3]]:[])]);
+      b.kpis.forEach(k=>{ const n=aNum(k.v), u=String(k.v).trim().match(/(%|kg|EV\/ha|cab\/ha|días?)$/); const est=k.s?{ok:13,warn:14,bad:15}[k.s]:null;
+        fila([[k.l+(u&&n!=null?` (${u[1]})`:""),12],[n!=null?n:k.v,est||(n!=null?(Number.isInteger(n)?5:6):4)],...(k.sub?[[k.sub,4]]:[])]); largo(0,k.l); if(k.sub) largo(2,k.sub); }); }
+    else if(b.tabla){ const T=b.tabla, tot=T.filas.length&&/^total/i.test(celdaT(T.filas[T.filas.length-1][0]));
+      fila(T.cols.map(c=>[c,3]),30); T.cols.forEach((c,i)=>largo(i,Math.min(String(c).length,14)));
+      T.filas.forEach((f,j)=>{ const esT=tot&&j===T.filas.length-1;
+        fila(f.map((c,i)=>{ const t=c&&typeof c==="object"?c.t+(c.sub?` (${c.sub})`:""):c, n=i>0?aNum(celdaT(c)):null, est=c&&c.s?{ok:13,warn:14,bad:15}[c.s]:null;
+          largo(i,c&&c.sub&&typeof c==="object"?c.t:t);
+          if(n!=null) return [n,est||(esT?(Number.isInteger(n)?8:9):(Number.isInteger(n)?5:6))];
+          return [t??"",est||(esT?7:4)]; })); }); }
+  }
+  const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews><cols>${W.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${Math.max(i===0?22:10,Math.round(w))}" customWidth="1"/>`).join("")}</cols><sheetData>${filas.join("")}</sheetData>${merges.length?`<mergeCells count="${merges.length}">${merges.map(m=>`<mergeCell ref="${m}"/>`).join("")}</mergeCells>`:""}<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="${ncol>8?"landscape":"portrait"}" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  const P="FF063537", T="FF17BEBB";
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.0"/></numFmts>
+<fonts count="10"><font><sz val="10"/><color rgb="FF1B2E30"/><name val="Calibri"/></font><font><b/><sz val="15"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="13"/><color rgb="${P}"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="${P}"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF0A6E6C"/><name val="Calibri"/></font><font><i/><sz val="9"/><color rgb="FF5E7273"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FF2E9E5B"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFC98A00"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFD64545"/><name val="Calibri"/></font></fonts>
+<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="${P}"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD6F2F1"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8F7F6"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFD9E3E1"/></left><right style="thin"><color rgb="FFD9E3E1"/></right><top style="thin"><color rgb="FFD9E3E1"/></top><bottom style="thin"><color rgb="FFD9E3E1"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="medium"><color rgb="${T}"/></bottom><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="16"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+<xf numFmtId="3" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="3" fontId="4" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="164" fontId="4" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+<xf numFmtId="164" fontId="7" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>
+<xf numFmtId="164" fontId="8" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>
+<xf numFmtId="164" fontId="9" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/></cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const hoja=(inf.tit||"Informe").replace(/[\\\/?*\[\]:]/g," ").slice(0,31);
+  return zipGuardar([
+    ["[Content_Types].xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
+    ["_rels/.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ["xl/workbook.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xEsc(hoja)}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+    ["xl/_rels/workbook.xml.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["xl/styles.xml",styles],
+    ["xl/worksheets/sheet1.xml",sheet]
+  ]);
+}
+/* ----- compartir: abre WhatsApp (o lo que elija) con el archivo; si el equipo no deja, lo descarga ----- */
+async function compartirInforme(key,fmt){
+  toast(fmt==="pdf"?"Armando el PDF…":"Armando el Excel…");
+  try{
+    const inf=informe(key), blob=fmt==="pdf"?await informePdf(inf):informeXlsx(inf);
+    const nombre=`APSAVET ${inf.estab} - ${inf.tit} ${inf.fecha}.${fmt}`.replace(/[\\\/:*?"<>|]/g,"-");
+    const mime=fmt==="pdf"?"application/pdf":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const file=new File([blob],nombre,{type:mime});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file],title:`${inf.estab} · ${inf.tit}`}); return; }
+      catch(err){ if(err&&err.name==="AbortError") return; }
+    }
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+    toast(`Se descargó "${nombre}". En WhatsApp: clip → Documento.`);
+  }catch(err){ console.error(err); toast("No se pudo armar el archivo"+(fmt==="pdf"&&!navigator.onLine?" (abrí la app una vez con señal para que se guarde el PDF)":"")); }
+}
+const btnsInf=key=>`<div class="noinf"><div class="lbl" style="margin:12px 0 6px">Compartir por WhatsApp</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn solid" data-inf="${key}" data-fmt="pdf">PDF</button><button class="btn solid" data-inf="${key}" data-fmt="xlsx">Excel</button><button class="btn" data-share="${key}">Copiar texto</button></div></div>`;
 function csv(rs){
   const cols=["fecha","tipo","campana","animal","ident","sena","madre","madreIdent","madreSena","sexo","estado","resultado","valor","peso","dificultad","causa","categoria","potrero","parcela","haParcela","lote","detalle","producto","cantidad","ce","aptitud","tricho","campylo","pastura","remanente","aguada","movimiento","cabezas","bebida","molino","alambrado","mov","kgTot","destino","servicio","pajuela","inseminador","operario","obs","lat","lng"];
   const q=v=>{ v=v==null?"":String(v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
@@ -1384,7 +1599,7 @@ function novedadesCard(){
     ${L.length?`<p class="small muted" style="margin:0 0 6px">${L.length} novedad${L.length===1?"":"es"}: ${Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${esc(c)} ${n}`).join(" · ")}</p>
     <div class="list">${L.slice(0,40).map(e=>`<div class="item"><span class="grow"><b>${esc(e.categoria||"Novedad")}${e.lote?` <span class="small muted">· ${esc(e.lote)}</span>`:""}</b>${e.obs?`<span class="small" style="display:block">${esc(e.obs)}</span>`:""}<span class="small muted" style="display:block">${fmtDT(e.fecha)}${e.potrero?" · potrero "+esc(e.potrero):""}${e.operario?" · "+esc(e.operario):""}</span></span><button class="chip" data-edit="${e.id}">Editar</button></div>`).join("")}</div>
     ${L.length>40?`<p class="small muted">Se muestran las últimas 40. El PDF las trae todas.</p>`:""}`:`<p class="muted" style="margin:0">Sin novedades en ${p[1].toLowerCase()}.</p>`}
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" data-share="nov">Copiar para WhatsApp</button><button class="btn" data-pdf="nov">Descargar PDF</button></div></div>`;
+    ${btnsInf("nov")}</div>`;
 }
 /* ----- recuentos de hacienda: cada conteo de lote queda registrado ----- */
 const compDet = (comp,E) => catsE(E).filter(c=>num((comp||{})[c.id])).map(c=>`${c.nombre} ${f0(num(comp[c.id]))}`).join(", ");
@@ -1410,7 +1625,7 @@ function recuentosCard(){
     <div class="chips" style="margin-bottom:8px">${meses.map(m=>`<button type="button" class="chip ${S.recMes===m?"ok":""}" data-recmes="${m}">${mesTxt(m)} (${cnt(m)})</button>`).join("")}<button type="button" class="chip ${!S.recMes?"ok":""}" data-recmes="">Todos</button></div>
     <div class="list">${L.map(e=>`<div class="item"><span class="grow"><b>${esc(e.lote)} · ${f0(num(e.cabezas)||0)} cab</b>${e.detalle?`<span class="small" style="display:block">${esc(e.detalle)}</span>`:""}<span class="small muted" style="display:block">${fT(e.fecha)}${e.operario?" · "+esc(e.operario):""}${e.virtual?" · conteo cargado en el lote":""}</span></span>${e.virtual?"":`<button class="chip bad" data-del="${e.id}">Quitar</button>`}</div>`).join("")}</div>
     <p class="small muted" style="margin:6px 0 0">Se registra solo al guardar un lote con cabezas nuevas o con otra fecha de conteo. Repartir las mismas cabezas en otras categorías no cuenta como recuento.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" data-share="rec">Copiar para WhatsApp</button><button class="btn" data-pdf="rec">Descargar PDF</button></div></div>`;
+    ${btnsInf("rec")}</div>`;
 }
 /* ----- PDF con formato APSAVET (se imprime → "Guardar como PDF") ----- */
 const tbl = (cab,filas,tot) => `<table><thead><tr>${cab.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${filas.map(f=>`<tr>${f.map(v=>`<td>${v==null?"":esc(v)}</td>`).join("")}</tr>`).join("")}${tot?`<tr class="tot">${tot.map(v=>`<td>${v==null?"":esc(v)}</td>`).join("")}</tr>`:""}</tbody></table>`;
@@ -1517,7 +1732,7 @@ function renderIndicadores(){
   </div>
   ${editorMetas()}
   ${compararCamp(cs)}
-  <button class="btn" data-share="camp">Copiar indicadores para WhatsApp</button><button class="btn" data-pdf="camp">Descargar PDF</button>`;
+  ${btnsInf("camp")}`;
 }
 function curvaParicion(k){
   const sem={}; k.par.forEach(e=>{ const key=claveGrupo(e,"semana"); sem[key]=(sem[key]||0)+1; });
@@ -1721,7 +1936,7 @@ function renderIndices(){
     <span class="small muted">Lo demás sale de lo que se carga a campo (partos, muertes, recorridas) y en manga (tacto, CC, destete, pesadas, entradas y salidas). La superficie y las cabezas salen de Oficina → Lotes.</span>
   </div>
   <p class="small muted">La campaña va del entore (octubre) en adelante: tacto, parición, destete y las ventas de ese ciclo.</p>
-  <button class="btn" data-share="idx">Copiar índices para WhatsApp</button><button class="btn" data-pdf="idx">Descargar PDF</button>`;
+  ${btnsInf("idx")}`;
 }
 /* ----- lotes ----- */
 function renderLotes(){
@@ -1756,7 +1971,7 @@ function renderLotes(){
   <p class="small muted" style="margin-top:-6px">Vacío = todo lo cargado en cada lote.</p>
   <div class="card scroll"><table><thead><tr><th>Lote</th><th>Vientres</th><th>Partos</th><th>% parición</th><th>Partos/día</th><th>Últ. 7 días</th><th>Peso nac.</th><th>Mort. perinatal %</th><th>Mort. terneros %</th><th>Mort. adultos %</th><th>Preñez %</th><th>Cab/ha</th></tr></thead><tbody>${L.map(l=>{ const k=calcLote(l,P.desde,P.hasta); return `<tr><td>${esc(l.nombre)}</td><td>${f0(k.vientres)}</td><td>${k.partos}</td><td>${f1(k.paricion)}</td><td>${f1(k.ritmo)}</td><td>${k.ult7}</td><td>${f1(k.pesoNac)}</td><td>${f1(k.mortPeri)}</td><td>${f1(k.mortTern)}</td><td>${f1(k.mortAd)}</td><td>${f1(k.prenez)}</td><td>${f1(k.carga)}</td></tr>`; }).join("")}</tbody></table></div>
   <p class="small muted">Parición = partos ÷ vientres del lote. Mortandad de adultos = muertes de vacas, vaquillonas y toros ÷ cabezas adultas del lote. Cada evento cuenta para el lote que se eligió al cargarlo.</p>
-  <button class="btn" data-share="lotes">Copiar para WhatsApp</button><button class="btn" data-pdf="lotes">Descargar PDF</button>`:""}`;
+  ${btnsInf("lotes")}`:""}`;
 }
 function formLoteEd(l){
   return `<div class="card"><h3 style="margin-top:0">${l._nuevo?"Nuevo lote":"Editar lote"}</h3>
@@ -1929,6 +2144,7 @@ if(f.tipo==="entore"){ auto("vientres", sumL(x=>vientresLote(x)||cabLote(x))); a
   }
   if(d.pedhecho){ const r=S.R[d.pedhecho]; if(r){ put({...r,resultado:"hecho",hecho:nowLocal(),hechoPor:S.set.operario||""}); toast("Pedido marcado como hecho"); render(); } return; }
   if(d.share){ copiar(textoShare(d.share)); return; }
+  if(d.inf){ compartirInforme(d.inf,d.fmt||"pdf"); return; }
   if(d.pdf){ pdfShare(d.pdf); return; }
   if(d.novper){ S.novPer=d.novper; const y=window.scrollY; render(); window.scrollTo(0,y); return; }
   if(d.recmes!==undefined){ S.recMes=d.recmes; const y=window.scrollY; render(); window.scrollTo(0,y); return; }

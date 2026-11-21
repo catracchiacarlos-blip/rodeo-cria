@@ -1,8 +1,8 @@
 // Rodeo de cría · APSAVET — guarda la app en el celular para que abra sin señal
 // Abre siempre al instante desde la copia guardada y, si hay señal, baja la versión nueva
 // en segundo plano (se ve la próxima vez que se abre).
-const VERSION = "rc-v42";
-const ARCHIVOS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
+const VERSION = "rc-v43";
+const ARCHIVOS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./lib/jspdf.umd.min.js", "./lib/jspdf.plugin.autotable.min.js"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
